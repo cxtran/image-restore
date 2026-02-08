@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Image Restore Studio</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Image Restore Studio</h1>
+
+      <section class="card" id="auth-card">
+        <h2>Auth</h2>
+        <div class="row">
+          <label>Email <input type="email" id="email" /></label>
+          <label>Password <input type="password" id="password" /></label>
+        </div>
+        <div class="row">
+          <button id="register-btn">Register</button>
+          <button id="login-btn">Login</button>
+          <button id="logout-btn" class="warn">Logout</button>
+        </div>
+        <div id="auth-status" class="muted"></div>
+      </section>
+
+      <section class="card">
+        <h2>Upload</h2>
+        <div class="row">
+          <input type="file" id="file-input" accept="image/*" />
+          <button id="upload-btn">Upload Photo</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Enhance</h2>
+        <div class="row">
+          <label><input type="checkbox" id="upscale" /> Real-ESRGAN 4x</label>
+          <label><input type="checkbox" id="face" /> GFPGAN face restore</label>
+          <label><input type="checkbox" id="colorize" /> DeOldify colorize</label>
+          <label><input type="checkbox" id="sharpen" /> Sharpen</label>
+          <label><input type="checkbox" id="denoise" /> Denoise</label>
+        </div>
+        <div class="row">
+          <label>Contrast <input type="number" id="contrast" value="1" step="0.1" min="0.1" max="3" /></label>
+          <label>Saturation <input type="number" id="saturation" value="1" step="0.1" min="0.1" max="3" /></label>
+          <label>Gamma <input type="number" id="gamma" value="1" step="0.1" min="0.1" max="3" /></label>
+        </div>
+        <div class="row">
+          <label>Image ID <input type="number" id="image-id" /></label>
+          <button id="process-btn">Run Enhancement</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Your Images</h2>
+        <button id="refresh-btn" class="secondary">Refresh</button>
+        <ul id="images"></ul>
+      </section>
+
+      <section class="card">
+        <h2>Download</h2>
+        <div class="row">
+          <label>Image ID <input type="number" id="download-image-id" /></label>
+          <label>Version (optional) <input type="number" id="download-version" /></label>
+          <button id="download-btn">Download</button>
+        </div>
+      </section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>

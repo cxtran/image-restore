@@ -1,0 +1,42 @@
+services:
+  mariadb:
+    image: mariadb:11
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: image_restore
+      MYSQL_USER: image_restore
+      MYSQL_PASSWORD: change-me
+      MYSQL_ROOT_PASSWORD: root-change-me
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  app:
+    image: node:20-bookworm
+    working_dir: /app
+    command: sh -c "npm install && npm start"
+    restart: unless-stopped
+    ports:
+      - "4011:4011"
+    environment:
+      PORT: 4011
+      NODE_ENV: production
+      JWT_SECRET: change-me
+      DB_HOST: mariadb
+      DB_USER: image_restore
+      DB_PASSWORD: change-me
+      DB_NAME: image_restore
+      UPLOAD_DIR: ./uploads
+      ESRGAN_URL: ""
+      REALESRGAN_CMD: ""
+      GFPGAN_CMD: ""
+      DEOLDIFY_CMD: ""
+      PYTHON_BIN: python3
+    depends_on:
+      - mariadb
+    volumes:
+      - ./:/app
+      - uploads_data:/app/uploads
+
+volumes:
+  mysql_data:
+  uploads_data:

@@ -1,0 +1,5 @@
+body { font-family: Arial, sans-serif; max-width: 860px; margin: 24px auto; padding: 0 12px; }
+section { margin-bottom: 16px; border: 1px solid #ddd; border-radius: 8px; padding: 12px; }
+input, button, label { margin: 4px; }
+label { display: inline-flex; gap: 4px; align-items: center; }
+.muted { color: #666; }

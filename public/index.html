@@ -1,0 +1,60 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Image Restore Studio</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Image Restore Studio</h1>
+      <p class="muted">Lotus-style backend: auth, upload, process, download.</p>
+
+      <section>
+        <h2>Auth</h2>
+        <input id="email" type="email" placeholder="email" />
+        <input id="password" type="password" placeholder="password" />
+        <button id="register">Register</button>
+        <button id="login">Login</button>
+        <button id="logout">Logout</button>
+      </section>
+
+      <section>
+        <h2>Upload</h2>
+        <input id="photo" type="file" accept="image/*" />
+        <button id="upload">Upload</button>
+      </section>
+
+      <section>
+        <h2>Process</h2>
+        <input id="imageId" type="number" placeholder="image id" />
+        <label><input id="upscale" type="checkbox" /> Real-ESRGAN 4x</label>
+        <label><input id="face" type="checkbox" /> GFPGAN face restore</label>
+        <label><input id="colorize" type="checkbox" /> DeOldify colorize</label>
+        <label><input id="sharpen" type="checkbox" /> Sharpen</label>
+        <label><input id="denoise" type="checkbox" /> Denoise</label>
+        <input id="contrast" type="number" step="0.1" value="1" placeholder="contrast" />
+        <input id="saturation" type="number" step="0.1" value="1" placeholder="saturation" />
+        <input id="gamma" type="number" step="0.1" value="1" placeholder="gamma" />
+        <button id="process">Run</button>
+      </section>
+
+      <section>
+        <h2>Images</h2>
+        <button id="refresh">Refresh</button>
+        <ul id="images"></ul>
+      </section>
+
+      <section>
+        <h2>Download</h2>
+        <input id="downId" type="number" placeholder="image id" />
+        <input id="downVersion" type="number" placeholder="version optional" />
+        <button id="download">Download</button>
+      </section>
+
+      <pre id="status"></pre>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>
