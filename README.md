@@ -1,4 +1,5 @@
 # Image Restore Studio (Lotus-style backend)
+#
 
 This app is structured similarly to `lotus-memories-db`:
 - `controllers/`, `routes/`, `middlewares/`, `db.js`, `app.js`
