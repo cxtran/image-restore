@@ -25,6 +25,35 @@ body {
   max-width: 1080px;
   margin: 24px auto;
   padding: 0 16px 24px;
+  position: relative;
+}
+
+.language-toggle-wrap {
+  position: absolute;
+  top: 4px;
+  right: 16px;
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid #c7d8e1;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 6px 16px rgba(16, 44, 58, 0.15);
+}
+
+.language-toggle-wrap label {
+  font-size: 12px;
+  color: #2c4f61;
+  font-weight: 600;
+}
+
+.language-toggle-wrap select {
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 999px;
+  min-width: 110px;
 }
 
 .hero {
@@ -848,6 +877,10 @@ button.ghost.danger:hover {
 }
 
 @media (max-width: 860px) {
+  .language-toggle-wrap {
+    position: static;
+    margin: 0 0 10px auto;
+  }
   .grid-3 { grid-template-columns: 1fr; }
   .preview-grid { grid-template-columns: 1fr; }
   .btn-row { flex-wrap: wrap; }

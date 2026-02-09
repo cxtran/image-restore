@@ -17,8 +17,236 @@ const state = {
   beforeBytes: null,
   afterBytes: null,
   beforeDims: null,
-  afterDims: null
+  afterDims: null,
+  currentUser: null
 };
+
+const LANG_KEY = 'ui_language';
+const supportedLanguages = new Set(['en', 'vi']);
+let currentLang = (() => {
+  const saved = String(window.localStorage.getItem(LANG_KEY) || 'en').toLowerCase();
+  return supportedLanguages.has(saved) ? saved : 'en';
+})();
+
+const i18n = {
+  en: {
+    title: 'Image Restore Studio',
+    language: 'Language',
+    account: 'Account',
+    register: 'Register',
+    email: 'Email',
+    password: 'Password',
+    login: 'Login',
+    admin: 'Admin',
+    logout: 'Logout',
+    uploadImage: 'Upload Image',
+    yourImages: 'Your Images',
+    refreshLibrary: 'Refresh Library',
+    notification: 'Notification',
+    close: 'Close',
+    confirmAction: 'Confirm Action',
+    cancel: 'Cancel',
+    confirm: 'Confirm',
+    createAccount: 'Create Account',
+    passwordMinHint: 'Password (min 8 chars)',
+    confirmPassword: 'Confirm Password',
+    changePasswordRequired: 'Change Password Required',
+    forcePasswordHint: 'For security, you must change your temporary password before continuing.',
+    currentPassword: 'Current Password',
+    newPasswordMinHint: 'New Password (min 8 chars)',
+    confirmNewPassword: 'Confirm New Password',
+    updatePassword: 'Update Password',
+    imageEnhancement: 'Image Enhancement',
+    faceRestore: 'Face Restore',
+    colorize: 'Colorize (DeOldify)',
+    resize4x: 'Resize (4x)',
+    resizeCustom: 'Resize (Custom)',
+    width: 'Width',
+    height: 'Height',
+    auto: 'auto',
+    faceStrength: 'Face Strength',
+    sharpen: 'Sharpen',
+    contrast: 'Contrast',
+    saturation: 'Saturation',
+    brightness: 'Brightness',
+    denoise: 'Denoise',
+    processing: 'Processing...',
+    original: 'Original',
+    enhanced: 'Enhanced',
+    sizeLine: 'Size: {size} | Resolution: {resolution}',
+    saveEnhancedVersion: 'Save Enhanced Version',
+    resetAllSettings: 'Reset All Settings',
+    generatePreview: 'Generate Preview',
+    cropPreview: 'Preview',
+    applyCrop: 'Apply Crop',
+    useOriginal: 'Use Original',
+    signedInAs: 'Signed in as {email}',
+    areYouSure: 'Are you sure?',
+    imageNumber: 'image #{n}',
+    view: 'View',
+    download: 'Download',
+    delete: 'Delete',
+    resolutionLoading: 'loading...',
+    resolutionDash: '-',
+    imageCaption: '{name} | size {size} | uploaded {time}',
+    versions: 'Versions:',
+    edit: 'Edit',
+    emailRequired: 'Email is required.',
+    passwordMin: 'Password must be at least 8 characters.',
+    passwordConfirmMismatch: 'Password confirmation does not match.',
+    registered: 'Registered: {email}',
+    registerFailed: 'Register failed.',
+    loggedIn: 'Logged in',
+    loginFailed: 'Login failed. Check your email and password, then try again.',
+    loggedOut: 'Logged out',
+    selectImageFirst: 'Select an image first',
+    selectImageFromList: 'Select an image first from Your Images',
+    uploaded: 'Uploaded "{name}"',
+    imageWord: 'image',
+    startingJob: 'Starting job',
+    widthPositive: 'Width must be a positive number',
+    heightPositive: 'Height must be a positive number or "auto"',
+    completed: 'Completed',
+    previewDone: 'Preview generation is complete. Click "Save Enhanced Version" to save.',
+    failedPrefix: 'Failed: {message}',
+    libraryRefreshed: 'Library refreshed',
+    resetDefaultsDone: 'All enhancement settings reset to default.',
+    noPendingPreview: 'No pending enhanced preview to save.',
+    enhancedSaved: 'Enhanced image saved.',
+    versionFileMissing: 'Version file is missing',
+    originalVersionDeleteBlocked: 'Original version cannot be deleted here',
+    deleteVersionConfirm: 'Delete version {version}?',
+    deletedVersion: 'Deleted version {version}',
+    versionActionFailed: 'Version action failed',
+    deleteImageConfirm: 'Delete "{name}"? This cannot be undone.',
+    deletedImage: 'Deleted "{name}"',
+    selectEnhancedFirst: 'Select one or more enhanced versions (2+) first.',
+    deleteSelectedEnhancedConfirm: 'Delete selected enhanced versions: {versions} ?',
+    deletedSelectedEnhanced: 'Deleted {count} selected enhanced version(s).',
+    deleteAllEnhancedConfirm: 'Delete all enhanced versions and keep only original image?',
+    deletedAllEnhanced: 'Deleted all enhanced versions.',
+    newPasswordMin: 'New password must be at least 8 characters.',
+    newPasswordConfirmMismatch: 'New password confirmation does not match.',
+    passwordUpdated: 'Password updated successfully.',
+    processingFailed: 'Processing failed',
+    heroSubtitle: 'Upload, restore, compare, and download your photos.'
+  },
+  vi: {
+    title: 'Image Restore Studio',
+    language: 'Ngôn ngữ',
+    account: 'Tài khoản',
+    register: 'Đăng ký',
+    email: 'Email',
+    password: 'Mật khẩu',
+    login: 'Đăng nhập',
+    admin: 'Quản trị',
+    logout: 'Đăng xuất',
+    uploadImage: 'Tải ảnh lên',
+    yourImages: 'Ảnh của bạn',
+    refreshLibrary: 'Làm mới thư viện',
+    notification: 'Thông báo',
+    close: 'Đóng',
+    confirmAction: 'Xác nhận thao tác',
+    cancel: 'Hủy',
+    confirm: 'Xác nhận',
+    createAccount: 'Tạo tài khoản',
+    passwordMinHint: 'Mật khẩu (ít nhất 8 ký tự)',
+    confirmPassword: 'Xác nhận mật khẩu',
+    changePasswordRequired: 'Yêu cầu đổi mật khẩu',
+    forcePasswordHint: 'Vì bảo mật, bạn phải đổi mật khẩu tạm trước khi tiếp tục.',
+    currentPassword: 'Mật khẩu hiện tại',
+    newPasswordMinHint: 'Mật khẩu mới (ít nhất 8 ký tự)',
+    confirmNewPassword: 'Xác nhận mật khẩu mới',
+    updatePassword: 'Cập nhật mật khẩu',
+    imageEnhancement: 'Nâng cấp ảnh',
+    faceRestore: 'Khôi phục khuôn mặt',
+    colorize: 'Tô màu (DeOldify)',
+    resize4x: 'Phóng to (4x)',
+    resizeCustom: 'Đổi kích thước (Tùy chỉnh)',
+    width: 'Chiều rộng',
+    height: 'Chiều cao',
+    auto: 'auto',
+    faceStrength: 'Độ mạnh khuôn mặt',
+    sharpen: 'Độ nét',
+    contrast: 'Tương phản',
+    saturation: 'Độ bão hòa',
+    brightness: 'Độ sáng',
+    denoise: 'Khử nhiễu',
+    processing: 'Đang xử lý...',
+    original: 'Gốc',
+    enhanced: 'Đã nâng cấp',
+    sizeLine: 'Kích thước: {size} | Độ phân giải: {resolution}',
+    saveEnhancedVersion: 'Lưu phiên bản nâng cấp',
+    resetAllSettings: 'Đặt lại mọi thiết lập',
+    generatePreview: 'Tạo xem trước',
+    cropPreview: 'Xem trước',
+    applyCrop: 'Áp dụng cắt',
+    useOriginal: 'Dùng ảnh gốc',
+    signedInAs: 'Đăng nhập với {email}',
+    areYouSure: 'Bạn có chắc không?',
+    imageNumber: 'ảnh #{n}',
+    view: 'Xem',
+    download: 'Tải xuống',
+    delete: 'Xóa',
+    resolutionLoading: 'đang tải...',
+    resolutionDash: '-',
+    imageCaption: '{name} | dung lượng {size} | tải lên {time}',
+    versions: 'Phiên bản:',
+    edit: 'Chỉnh sửa',
+    emailRequired: 'Email là bắt buộc.',
+    passwordMin: 'Mật khẩu phải có ít nhất 8 ký tự.',
+    passwordConfirmMismatch: 'Xác nhận mật khẩu không khớp.',
+    registered: 'Đã đăng ký: {email}',
+    registerFailed: 'Đăng ký thất bại.',
+    loggedIn: 'Đã đăng nhập',
+    loginFailed: 'Đăng nhập thất bại. Hãy kiểm tra email và mật khẩu rồi thử lại.',
+    loggedOut: 'Đã đăng xuất',
+    selectImageFirst: 'Hãy chọn ảnh trước',
+    selectImageFromList: 'Hãy chọn ảnh trước từ mục Ảnh của bạn',
+    uploaded: 'Đã tải lên "{name}"',
+    imageWord: 'ảnh',
+    startingJob: 'Bắt đầu xử lý',
+    widthPositive: 'Chiều rộng phải là số dương',
+    heightPositive: 'Chiều cao phải là số dương hoặc "auto"',
+    completed: 'Hoàn tất',
+    previewDone: 'Đã tạo xong ảnh xem trước. Nhấn "Lưu phiên bản nâng cấp" để lưu.',
+    failedPrefix: 'Lỗi: {message}',
+    libraryRefreshed: 'Đã làm mới thư viện',
+    resetDefaultsDone: 'Đã đặt lại toàn bộ thiết lập nâng cấp về mặc định.',
+    noPendingPreview: 'Không có bản xem trước nâng cấp để lưu.',
+    enhancedSaved: 'Đã lưu ảnh nâng cấp.',
+    versionFileMissing: 'Không tìm thấy tệp phiên bản',
+    originalVersionDeleteBlocked: 'Không thể xóa phiên bản gốc ở đây',
+    deleteVersionConfirm: 'Xóa phiên bản {version}?',
+    deletedVersion: 'Đã xóa phiên bản {version}',
+    versionActionFailed: 'Thao tác phiên bản thất bại',
+    deleteImageConfirm: 'Xóa "{name}"? Thao tác này không thể hoàn tác.',
+    deletedImage: 'Đã xóa "{name}"',
+    selectEnhancedFirst: 'Hãy chọn một hoặc nhiều phiên bản nâng cấp (2+) trước.',
+    deleteSelectedEnhancedConfirm: 'Xóa các phiên bản nâng cấp đã chọn: {versions} ?',
+    deletedSelectedEnhanced: 'Đã xóa {count} phiên bản nâng cấp đã chọn.',
+    deleteAllEnhancedConfirm: 'Xóa toàn bộ phiên bản nâng cấp và chỉ giữ ảnh gốc?',
+    deletedAllEnhanced: 'Đã xóa toàn bộ phiên bản nâng cấp.',
+    newPasswordMin: 'Mật khẩu mới phải có ít nhất 8 ký tự.',
+    newPasswordConfirmMismatch: 'Xác nhận mật khẩu mới không khớp.',
+    passwordUpdated: 'Cập nhật mật khẩu thành công.',
+    processingFailed: 'Xử lý thất bại',
+    heroSubtitle: 'Tải lên, khôi phục, so sánh và tải xuống ảnh của bạn.'
+  }
+};
+
+function t(key, params = {}) {
+  const pack = i18n[currentLang] || i18n.en;
+  const fallback = i18n.en[key];
+  const template = pack[key] || fallback || key;
+  return String(template).replace(/\{(\w+)\}/g, (_, token) => (
+    Object.prototype.hasOwnProperty.call(params, token) ? String(params[token]) : `{${token}}`
+  ));
+}
+
+function getLocale() {
+  return currentLang === 'vi' ? 'vi-VN' : 'en-US';
+}
 
 const statusEl = document.getElementById('status');
 const noticeModalEl = document.getElementById('noticeModal');
@@ -83,6 +311,8 @@ const cropPreviewEl = document.getElementById('cropPreview');
 const cropCancelEl = document.getElementById('cropCancel');
 const cropApplyEl = document.getElementById('cropApply');
 const cropUseOriginalEl = document.getElementById('cropUseOriginal');
+const languageLabelEl = document.getElementById('languageLabel');
+const languageToggleEl = document.getElementById('languageToggle');
 const socket = window.io ? window.io({ withCredentials: true }) : null;
 let socketId = null;
 let cropper = null;
@@ -112,7 +342,7 @@ versionViewModalEl.className = 'version-view-modal';
 versionViewModalEl.hidden = true;
 versionViewModalEl.innerHTML = `
   <div class="version-view-dialog">
-    <button type="button" class="version-view-close" aria-label="Close">×</button>
+    <button type="button" class="version-view-close" aria-label="Close">&times;</button>
     <img class="version-view-image" alt="Version image preview" />
   </div>
 `;
@@ -130,7 +360,127 @@ function syncUseEnhancedButton() {
   useEnhancedBtnEl.disabled = !state.pendingEnhancedPath;
 }
 
-function setProgress(progress, message = 'Processing...') {
+function setCheckboxLabel(inputId, labelText) {
+  const inputEl = document.getElementById(inputId);
+  if (!inputEl) return;
+  const wrap = inputEl.closest('label');
+  if (!wrap) return;
+  const textNode = Array.from(wrap.childNodes).find((node) => node.nodeType === Node.TEXT_NODE);
+  if (textNode) textNode.nodeValue = ` ${labelText}`;
+}
+
+function applyLanguage() {
+  document.documentElement.lang = currentLang === 'vi' ? 'vi' : 'en';
+  document.title = t('title');
+  if (languageLabelEl) languageLabelEl.textContent = t('language');
+  if (languageToggleEl) {
+    languageToggleEl.value = currentLang;
+    languageToggleEl.setAttribute('aria-label', t('language'));
+  }
+
+  const setText = (id, key) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = t(key);
+  };
+  const setPlaceholder = (id, key) => {
+    const el = document.getElementById(id);
+    if (el) el.placeholder = t(key);
+  };
+
+  setText('heroTitle', 'title');
+  setText('heroSubtitle', 'heroSubtitle');
+  setText('accountTitle', 'account');
+  setText('register', 'register');
+  setText('login', 'login');
+  setText('adminLink', 'admin');
+  setText('logout', 'logout');
+  setText('uploadTitle', 'uploadImage');
+  setText('yourImagesTitle', 'yourImages');
+  setText('noticeTitle', 'notification');
+  setText('noticeClose', 'close');
+  setText('confirmTitle', 'confirmAction');
+  setText('confirmCancel', 'cancel');
+  setText('confirmOk', 'confirm');
+  setText('registerTitle', 'createAccount');
+  setText('registerCancel', 'cancel');
+  setText('registerSubmit', 'register');
+  setText('forcePasswordTitle', 'changePasswordRequired');
+  setText('forcePasswordHint', 'forcePasswordHint');
+  setText('forcePasswordSubmit', 'updatePassword');
+  setText('forcePasswordLogout', 'logout');
+  setText('enhanceTitle', 'imageEnhancement');
+  setText('originalTitle', 'original');
+  setText('enhancedTitle', 'enhanced');
+  setText('closeEnhanceModal', 'cancel');
+  setText('useEnhancedBtn', 'saveEnhancedVersion');
+  setText('resetAdjustmentsBtn', 'resetAllSettings');
+  setText('process', 'generatePreview');
+  setText('cropTitle', 'uploadImage');
+  setText('cropPreviewTitle', 'cropPreview');
+  setText('cropCancel', 'cancel');
+  setText('cropApply', 'applyCrop');
+  setText('cropUseOriginal', 'useOriginal');
+
+  setPlaceholder('email', 'email');
+  setPlaceholder('password', 'password');
+  setPlaceholder('registerEmail', 'email');
+  setPlaceholder('registerPassword', 'passwordMinHint');
+  setPlaceholder('registerPasswordConfirm', 'confirmPassword');
+  setPlaceholder('forceCurrentPassword', 'currentPassword');
+  setPlaceholder('forceNewPassword', 'newPasswordMinHint');
+  setPlaceholder('forceConfirmPassword', 'confirmNewPassword');
+  setPlaceholder('targetWidth', 'width');
+  setPlaceholder('targetHeight', 'auto');
+
+  setCheckboxLabel('face', t('faceRestore'));
+  setCheckboxLabel('colorize', t('colorize'));
+  setCheckboxLabel('upscale', t('resize4x'));
+  setCheckboxLabel('resize', t('resizeCustom'));
+
+  const refreshBtn = document.getElementById('refresh');
+  if (refreshBtn) {
+    refreshBtn.title = t('refreshLibrary');
+    refreshBtn.setAttribute('aria-label', t('refreshLibrary'));
+  }
+  if (uploadedPreviewEl) uploadedPreviewEl.alt = t('original');
+  if (completedPreviewEl) completedPreviewEl.alt = t('enhanced');
+  const cropImage = document.getElementById('cropImage');
+  if (cropImage) cropImage.alt = t('cropPreview');
+  const versionHoverImage = document.getElementById('versionHoverImage');
+  if (versionHoverImage) versionHoverImage.alt = t('enhanced');
+  if (versionViewCloseEl) versionViewCloseEl.setAttribute('aria-label', t('close'));
+  if (versionViewImageEl) versionViewImageEl.alt = t('enhanced');
+
+  const viewBtn = versionContextMenuEl.querySelector('button[data-action="view"]');
+  const downloadBtn = versionContextMenuEl.querySelector('button[data-action="download"]');
+  const deleteBtn = versionContextMenuEl.querySelector('button[data-action="delete"]');
+  if (viewBtn) viewBtn.textContent = t('view');
+  if (downloadBtn) downloadBtn.textContent = t('download');
+  if (deleteBtn) deleteBtn.textContent = t('delete');
+  if (versionMenuMetaEl) {
+    versionMenuMetaEl.textContent = t('sizeLine', {
+      size: t('resolutionDash'),
+      resolution: t('resolutionDash')
+    });
+  }
+
+  updateSliderLabels();
+  updatePreviewSizeLabels();
+  renderImageList();
+  if (state.currentUser && state.currentUser.email) {
+    accountLabelEl.textContent = t('signedInAs', { email: state.currentUser.email });
+  }
+}
+
+function setLanguage(lang) {
+  const next = supportedLanguages.has(lang) ? lang : 'en';
+  if (currentLang === next) return;
+  currentLang = next;
+  window.localStorage.setItem(LANG_KEY, currentLang);
+  applyLanguage();
+}
+
+function setProgress(progress, message = t('processing')) {
   const pct = Math.max(0, Math.min(100, Number(progress) || 0));
   if (progressHideTimer) {
     window.clearTimeout(progressHideTimer);
@@ -155,7 +505,7 @@ function resetProgress() {
   progressWrapEl.hidden = true;
   progressBarEl.style.width = '0%';
   progressPercentEl.textContent = '0%';
-  progressLabelEl.textContent = 'Processing...';
+  progressLabelEl.textContent = t('processing');
 }
 
 function formatBytes(bytes) {
@@ -172,21 +522,21 @@ function formatBytes(bytes) {
 
 function formatSizeLine(bytes, dims) {
   const bytePart = formatBytes(bytes);
-  const dimPart = dims ? `${dims.width}x${dims.height}px` : '-';
-  return `Size: ${bytePart} | Resolution: ${dimPart}`;
+  const dimPart = dims ? `${dims.width}x${dims.height}px` : t('resolutionDash');
+  return t('sizeLine', { size: bytePart, resolution: dimPart });
 }
 
 function formatUploadedAt(value) {
-  if (!value) return '-';
+  if (!value) return t('resolutionDash');
   const dt = new Date(value);
-  if (Number.isNaN(dt.getTime())) return '-';
-  return dt.toLocaleString();
+  if (Number.isNaN(dt.getTime())) return t('resolutionDash');
+  return dt.toLocaleString(getLocale());
 }
 
 function getImageNameById(imageId) {
   const n = Number(imageId);
   const row = state.images.find((x) => Number(x.id) === n);
-  return row?.original_name || `image #${n}`;
+  return row?.original_name || t('imageNumber', { n });
 }
 
 function updatePreviewSizeLabels() {
@@ -195,12 +545,30 @@ function updatePreviewSizeLabels() {
 }
 
 function updateSliderLabels() {
+  const faceWrap = faceStrengthValueEl.closest('.slider-title');
+  const sharpenWrap = sharpenValueEl.closest('.slider-title');
+  const contrastWrap = contrastValueEl.closest('.slider-title');
+  const saturationWrap = saturationValueEl.closest('.slider-title');
+  const gammaWrap = gammaValueEl.closest('.slider-title');
+  const denoiseWrap = denoiseValueEl.closest('.slider-title');
+  const widthWrap = targetWidthEl.closest('.slider-wrap')?.querySelector('.slider-title');
+  const heightWrap = targetHeightEl.closest('.slider-wrap')?.querySelector('.slider-title');
+
   faceStrengthValueEl.textContent = Number(faceStrengthEl.value || 0.7).toFixed(1);
   contrastValueEl.textContent = Number(contrastEl.value || 1).toFixed(1);
   saturationValueEl.textContent = Number(saturationEl.value || 1).toFixed(1);
   gammaValueEl.textContent = Number(gammaEl.value || 1).toFixed(1);
   sharpenValueEl.textContent = Number(sharpenEl.value || 0).toFixed(1);
   denoiseValueEl.textContent = String(Math.round(Number(denoiseEl.value || 0)));
+
+  if (faceWrap) faceWrap.childNodes[0].nodeValue = `${t('faceStrength')}: `;
+  if (sharpenWrap) sharpenWrap.childNodes[0].nodeValue = `${t('sharpen')}: `;
+  if (contrastWrap) contrastWrap.childNodes[0].nodeValue = `${t('contrast')}: `;
+  if (saturationWrap) saturationWrap.childNodes[0].nodeValue = `${t('saturation')}: `;
+  if (gammaWrap) gammaWrap.childNodes[0].nodeValue = `${t('brightness')}: `;
+  if (denoiseWrap) denoiseWrap.childNodes[0].nodeValue = `${t('denoise')}: `;
+  if (widthWrap) widthWrap.textContent = t('width');
+  if (heightWrap) heightWrap.textContent = t('height');
 }
 
 function syncResizeInputs() {
@@ -258,6 +626,7 @@ function setAuthUI(user) {
   const loggedIn = Boolean(user && user.email);
   const role = (user && user.role) ? String(user.role).toLowerCase() : 'user';
   forcePasswordRequired = Boolean(user && user.force_password_change);
+  state.currentUser = loggedIn ? user : null;
   authGuestEl.hidden = loggedIn;
   authUserEl.hidden = !loggedIn;
   if (registerBtnEl) registerBtnEl.hidden = loggedIn;
@@ -267,7 +636,7 @@ function setAuthUI(user) {
   }
   authGuestEl.style.display = loggedIn ? 'none' : 'grid';
   authUserEl.style.display = loggedIn ? 'flex' : 'none';
-  accountLabelEl.textContent = loggedIn ? `Signed in as ${user.email}` : '';
+  accountLabelEl.textContent = loggedIn ? t('signedInAs', { email: user.email }) : '';
   if (adminLinkEl) adminLinkEl.hidden = !(loggedIn && role === 'admin');
   authOnlyEls.forEach((el) => {
     el.hidden = !loggedIn || forcePasswordRequired;
@@ -309,7 +678,7 @@ function askConfirm(message) {
     confirmResolver(false);
     confirmResolver = null;
   }
-  confirmMessageEl.textContent = String(message || 'Are you sure?');
+  confirmMessageEl.textContent = String(message || t('areYouSure'));
   confirmModalEl.hidden = false;
   return new Promise((resolve) => {
     confirmResolver = resolve;
@@ -481,7 +850,10 @@ function showVersionMenu(imageId, versionNum, filePath, sizeBytes, event) {
     versionMenuDeleteBtnEl.hidden = Number(versionNum) <= 1;
   }
   if (versionMenuMetaEl) {
-    versionMenuMetaEl.textContent = `Size: ${formatBytes(versionMenuState.sizeBytes)} | Resolution: loading...`;
+    versionMenuMetaEl.textContent = t('sizeLine', {
+      size: formatBytes(versionMenuState.sizeBytes),
+      resolution: t('resolutionLoading')
+    });
   }
 
   const menuW = 140;
@@ -518,10 +890,10 @@ function showVersionMenu(imageId, versionNum, filePath, sizeBytes, event) {
     if (versionMenuState.filePath !== filePath || versionContextMenuEl.hidden) return;
     const sizeText = formatBytes(versionMenuState.sizeBytes);
     if (!dims) {
-      versionMenuMetaEl.textContent = `Size: ${sizeText} | Resolution: -`;
+      versionMenuMetaEl.textContent = t('sizeLine', { size: sizeText, resolution: t('resolutionDash') });
       return;
     }
-    versionMenuMetaEl.textContent = `Size: ${sizeText} | Resolution: ${dims.width}x${dims.height}px`;
+    versionMenuMetaEl.textContent = t('sizeLine', { size: sizeText, resolution: `${dims.width}x${dims.height}px` });
   });
 }
 
@@ -563,7 +935,7 @@ function closeCropModal() {
 
 async function deleteImage(imageId) {
   const imageName = getImageNameById(imageId);
-  const ok = await askConfirm(`Delete "${imageName}"? This cannot be undone.`);
+  const ok = await askConfirm(t('deleteImageConfirm', { name: imageName }));
   if (!ok) return;
 
   await api(`/api/images/${imageId}`, { method: 'DELETE' });
@@ -578,7 +950,7 @@ async function deleteImage(imageId) {
   }
 
   await refreshImages();
-  log(`Deleted "${imageName}"`, { popup: true });
+  log(t('deletedImage', { name: imageName }), { popup: true });
 }
 
 async function deleteSelectedEnhancedVersions(imageId, versions = []) {
@@ -586,10 +958,12 @@ async function deleteSelectedEnhancedVersions(imageId, versions = []) {
     .map((v) => Number(v))
     .filter((v) => Number.isInteger(v) && v > 1);
   if (!selectedEnhanced.length) {
-    throw new Error('Select one or more enhanced versions (2+) first.');
+    throw new Error(t('selectEnhancedFirst'));
   }
 
-  const ok = await askConfirm(`Delete selected enhanced versions: ${selectedEnhanced.sort((a, b) => a - b).join(', ')} ?`);
+  const ok = await askConfirm(t('deleteSelectedEnhancedConfirm', {
+    versions: selectedEnhanced.sort((a, b) => a - b).join(', ')
+  }));
   if (!ok) return;
 
   await api(`/api/images/${imageId}/versions`, {
@@ -601,11 +975,11 @@ async function deleteSelectedEnhancedVersions(imageId, versions = []) {
   const selectedSet = getSelectedVersions(imageId);
   selectedEnhanced.forEach((v) => selectedSet.delete(v));
   await refreshImages();
-  log(`Deleted ${selectedEnhanced.length} selected enhanced version(s).`, { popup: true });
+  log(t('deletedSelectedEnhanced', { count: selectedEnhanced.length }), { popup: true });
 }
 
 async function deleteAllEnhancedVersions(imageId) {
-  const ok = await askConfirm('Delete all enhanced versions and keep only original image?');
+  const ok = await askConfirm(t('deleteAllEnhancedConfirm'));
   if (!ok) return;
 
   await api(`/api/images/${imageId}/enhanced`, { method: 'DELETE' });
@@ -613,7 +987,7 @@ async function deleteAllEnhancedVersions(imageId) {
   const selectedSet = getSelectedVersions(imageId);
   selectedSet.clear();
   await refreshImages();
-  log('Deleted all enhanced versions.', { popup: true });
+  log(t('deletedAllEnhanced'), { popup: true });
 }
 
 function renderImageList() {
@@ -641,14 +1015,18 @@ function renderImageList() {
 
     const meta = document.createElement('span');
     meta.className = 'image-caption';
-    meta.textContent = `${row.original_name} | size ${formatBytes(row.current_size_bytes)} | uploaded ${formatUploadedAt(row.created_at)}`;
+    meta.textContent = t('imageCaption', {
+      name: row.original_name,
+      size: formatBytes(row.current_size_bytes),
+      time: formatUploadedAt(row.created_at)
+    });
     topRow.appendChild(icon);
 
     const versions = document.createElement('div');
     versions.className = 'version-row';
     const versionTitle = document.createElement('span');
     versionTitle.className = 'version-title';
-    versionTitle.textContent = 'Versions:';
+    versionTitle.textContent = t('versions');
     versions.appendChild(versionTitle);
     (row.versions || []).forEach((v) => {
       const chip = document.createElement('button');
@@ -691,7 +1069,7 @@ function renderImageList() {
 
     const restoreBtn = document.createElement('button');
     restoreBtn.className = 'ghost';
-    restoreBtn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6V3L8 7l4 4V8c2.8 0 5 2.2 5 5a5 5 0 0 1-5 5 5 5 0 0 1-4.9-4H5.1A7 7 0 0 0 12 20a7 7 0 0 0 0-14z"/></svg><span>Edit</span>';
+    restoreBtn.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6V3L8 7l4 4V8c2.8 0 5 2.2 5 5a5 5 0 0 1-5 5 5 5 0 0 1-4.9-4H5.1A7 7 0 0 0 12 20a7 7 0 0 0 0-14z"/></svg><span>${t('edit')}</span>`;
     restoreBtn.onclick = () => {
       state.suppressExistingEnhancedPreview = true;
       setSelectedImage(row, { showCurrentAsEnhanced: false });
@@ -700,7 +1078,7 @@ function renderImageList() {
 
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'danger ghost';
-    deleteBtn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5h8l1 2h4v2H3V7h4l1-2zm1 6h2v8H9v-8zm4 0h2v8h-2v-8z"/></svg><span>Delete</span>';
+    deleteBtn.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5h8l1 2h4v2H3V7h4l1-2zm1 6h2v8H9v-8zm4 0h2v8h-2v-8z"/></svg><span>${t('delete')}</span>`;
     deleteBtn.onclick = () => deleteImage(row.id).catch((e) => log(e.message));
     actions.appendChild(restoreBtn);
     actions.appendChild(deleteBtn);
@@ -719,16 +1097,16 @@ registerSubmitEl.onclick = async () => {
     const email = registerEmailEl.value.trim();
     const password = registerPasswordEl.value;
     const confirmPassword = registerPasswordConfirmEl.value;
-    if (!email) throw new Error('Email is required.');
-    if (password.length < 8) throw new Error('Password must be at least 8 characters.');
-    if (password !== confirmPassword) throw new Error('Password confirmation does not match.');
+    if (!email) throw new Error(t('emailRequired'));
+    if (password.length < 8) throw new Error(t('passwordMin'));
+    if (password !== confirmPassword) throw new Error(t('passwordConfirmMismatch'));
 
     const data = await api('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
     });
-    log(`Registered: ${data.email}`, { popup: true });
+    log(t('registered', { email: data.email }), { popup: true });
     document.getElementById('email').value = '';
     document.getElementById('password').value = '';
     closeRegisterModal();
@@ -736,7 +1114,7 @@ registerSubmitEl.onclick = async () => {
       window.location.reload();
     }, 250);
   } catch (e) {
-    registerMessageEl.textContent = e.message || 'Register failed.';
+    registerMessageEl.textContent = e.message || t('registerFailed');
     registerMessageEl.hidden = false;
   }
 };
@@ -759,10 +1137,10 @@ document.getElementById('login').onclick = async () => {
       authMessageEl.textContent = '';
       authMessageEl.hidden = true;
     }
-    log('Logged in');
+    log(t('loggedIn'));
   } catch (e) {
     if (authMessageEl) {
-      authMessageEl.textContent = e.message || 'Login failed. Check your email and password, then try again.';
+      authMessageEl.textContent = e.message || t('loginFailed');
       authMessageEl.hidden = false;
     }
     log(e.message);
@@ -785,7 +1163,7 @@ document.getElementById('logout').onclick = async () => {
     forcePasswordRequired = false;
     renderImageList();
     renderPreviews();
-    log('Logged out');
+    log(t('loggedOut'));
   } catch (e) {
     log(e.message);
   }
@@ -793,7 +1171,7 @@ document.getElementById('logout').onclick = async () => {
 
 async function uploadPendingOrSelectedFile() {
   const file = pendingUploadFile || photoInputEl.files[0];
-  if (!file) throw new Error('Select an image first');
+  if (!file) throw new Error(t('selectImageFirst'));
 
   const form = new FormData();
   form.append('photo', file);
@@ -807,23 +1185,23 @@ async function uploadPendingOrSelectedFile() {
   pendingUploadFile = null;
   photoInputEl.value = '';
 
-  log(`Uploaded "${file.name || 'image'}"`);
+  log(t('uploaded', { name: file.name || t('imageWord') }));
   await refreshImages();
 }
 
 document.getElementById('process').onclick = async () => {
   try {
     const imageId = Number(state.selectedImageId);
-    if (!imageId) throw new Error('Select an image first from Your Images');
-    setProgress(3, 'Starting job');
+    if (!imageId) throw new Error(t('selectImageFromList'));
+    setProgress(3, t('startingJob'));
     const targetWidth = Number(targetWidthEl.value);
     const targetHeightRaw = String(targetHeightEl.value || '').trim().toLowerCase();
     let targetHeightValue = null;
     if (resizeEl.checked) {
-      if (!Number.isFinite(targetWidth) || targetWidth <= 0) throw new Error('Width must be a positive number');
+      if (!Number.isFinite(targetWidth) || targetWidth <= 0) throw new Error(t('widthPositive'));
       if (targetHeightRaw !== '' && targetHeightRaw !== 'auto') {
         const targetHeight = Number(targetHeightRaw);
-        if (!Number.isFinite(targetHeight) || targetHeight <= 0) throw new Error('Height must be a positive number or "auto"');
+        if (!Number.isFinite(targetHeight) || targetHeight <= 0) throw new Error(t('heightPositive'));
         targetHeightValue = Math.round(targetHeight);
       }
     }
@@ -858,11 +1236,11 @@ document.getElementById('process').onclick = async () => {
     state.pendingEnhancedPath = data.preview_path || data.path || '';
     state.afterBytes = null;
     renderPreviews();
-    setProgress(100, 'Completed');
+    setProgress(100, t('completed'));
 
-    log('Preview generation is complete. Click "Save Enhanced Version" to save.');
+    log(t('previewDone'));
   } catch (e) {
-    setProgress(0, `Failed: ${e.message}`);
+    setProgress(0, t('failedPrefix', { message: e.message }));
     log(e.message);
   }
 };
@@ -900,7 +1278,7 @@ async function refreshImages() {
 document.getElementById('refresh').onclick = async () => {
   try {
     await refreshImages();
-    log('Library refreshed');
+    log(t('libraryRefreshed'));
   } catch (e) {
     log(e.message);
   }
@@ -909,12 +1287,12 @@ document.getElementById('refresh').onclick = async () => {
 closeEnhanceModalEl.addEventListener('click', closeEnhanceModal);
 resetAdjustmentsBtnEl.addEventListener('click', () => {
   resetEnhanceAdjustments();
-  log('All enhancement settings reset to default.');
+  log(t('resetDefaultsDone'));
 });
 useEnhancedBtnEl.addEventListener('click', () => {
   const imageId = Number(state.selectedImageId);
   if (!imageId || !state.pendingEnhancedPath) {
-    log('No pending enhanced preview to save.');
+    log(t('noPendingPreview'));
     closeEnhanceModal();
     return;
   }
@@ -928,7 +1306,7 @@ useEnhancedBtnEl.addEventListener('click', () => {
       state.pendingEnhancedPath = '';
       await refreshImages();
       closeEnhanceModal();
-      log('Enhanced image saved.');
+      log(t('enhancedSaved'));
     })
     .catch((e) => log(e.message));
 });
@@ -1002,7 +1380,7 @@ versionContextMenuEl.addEventListener('click', async (e) => {
   try {
     if (!imageId || !versionNum) return;
     if (action === 'view') {
-      if (!filePath) throw new Error('Version file is missing');
+      if (!filePath) throw new Error(t('versionFileMissing'));
       openVersionViewModal(filePath);
       return;
     }
@@ -1011,8 +1389,8 @@ versionContextMenuEl.addEventListener('click', async (e) => {
       return;
     }
     if (action === 'delete') {
-      if (versionNum <= 1) throw new Error('Original version cannot be deleted here');
-      const ok = await askConfirm(`Delete version ${versionNum}?`);
+      if (versionNum <= 1) throw new Error(t('originalVersionDeleteBlocked'));
+      const ok = await askConfirm(t('deleteVersionConfirm', { version: versionNum }));
       if (!ok) return;
       await api(`/api/images/${imageId}/versions`, {
         method: 'DELETE',
@@ -1022,10 +1400,10 @@ versionContextMenuEl.addEventListener('click', async (e) => {
       const selectedSet = getSelectedVersions(imageId);
       selectedSet.delete(versionNum);
       await refreshImages();
-      log(`Deleted version ${versionNum}`, { popup: true });
+      log(t('deletedVersion', { version: versionNum }), { popup: true });
     }
   } catch (err) {
-    log(err.message || 'Version action failed');
+    log(err.message || t('versionActionFailed'));
   }
 });
 
@@ -1066,6 +1444,14 @@ completedPreviewEl.addEventListener('load', () => {
   updatePreviewSizeLabels();
 });
 
+if (languageToggleEl) {
+  languageToggleEl.value = currentLang;
+  languageToggleEl.addEventListener('change', (event) => {
+    setLanguage(String(event.target.value || 'en').toLowerCase());
+  });
+}
+
+applyLanguage();
 refreshImages().catch(() => {});
 renderPreviews();
 syncUseEnhancedButton();
@@ -1094,10 +1480,10 @@ if (socket) {
     const activeImageId = Number(state.selectedImageId);
     if (activeImageId && Number(event.imageId) !== activeImageId) return;
     if (event.error) {
-      setProgress(0, `Failed: ${event.message || 'Processing failed'}`);
+      setProgress(0, t('failedPrefix', { message: event.message || t('processingFailed') }));
       return;
     }
-    setProgress(event.progress, event.message || 'Processing...');
+    setProgress(event.progress, event.message || t('processing'));
   });
 }
 
@@ -1137,8 +1523,8 @@ if (forcePasswordSubmitEl) {
       const currentPassword = String(forceCurrentPasswordEl.value || '');
       const newPassword = String(forceNewPasswordEl.value || '');
       const confirmPassword = String(forceConfirmPasswordEl.value || '');
-      if (newPassword.length < 8) throw new Error('New password must be at least 8 characters.');
-      if (newPassword !== confirmPassword) throw new Error('New password confirmation does not match.');
+      if (newPassword.length < 8) throw new Error(t('newPasswordMin'));
+      if (newPassword !== confirmPassword) throw new Error(t('newPasswordConfirmMismatch'));
       await api('/api/auth/change-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1150,7 +1536,7 @@ if (forcePasswordSubmitEl) {
       forcePasswordRequired = false;
       setAuthUI({ ...(await api('/api/auth/me')) });
       await refreshImages();
-      log('Password updated successfully.');
+      log(t('passwordUpdated'));
     } catch (error) {
       log(error.message, { popup: true });
     }

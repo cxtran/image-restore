@@ -9,14 +9,21 @@
   </head>
   <body>
     <main class="app-shell">
+      <div class="language-toggle-wrap">
+        <label id="languageLabel" for="languageToggle">Language</label>
+        <select id="languageToggle" aria-label="Language">
+          <option value="en">English</option>
+          <option value="vi">Tiếng Việt</option>
+        </select>
+      </div>
       <header class="hero">
-        <h1>Image Restore Studio</h1>
-        <p>Upload, restore, compare, and download your photos.</p>
+        <h1 id="heroTitle">Image Restore Studio</h1>
+        <p id="heroSubtitle">Upload, restore, compare, and download your photos.</p>
       </header>
 
       <section id="panelAccount" class="panel">
         <div id="accountHead" class="account-head">
-          <h2>Account</h2>
+          <h2 id="accountTitle">Account</h2>
           <button id="register" class="ghost subtle-btn">Register</button>
         </div>
         <div id="authGuest" class="grid-3">
@@ -37,7 +44,7 @@
       </section>
 
       <section id="panelUpload" class="panel auth-only">
-        <h2>Upload Image</h2>
+        <h2 id="uploadTitle">Upload Image</h2>
         <div class="grid-3">
           <input id="photo" type="file" accept="image/*" />
         </div>
@@ -45,7 +52,7 @@
 
       <section id="panelImages" class="panel auth-only">
         <div class="panel-head">
-          <h2>Your Images</h2>
+          <h2 id="yourImagesTitle">Your Images</h2>
           <button id="refresh" class="icon-btn ghost" aria-label="Refresh Library" title="Refresh Library">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5a7 7 0 0 1 6.65 4.8H21l-3.4 3.9-3.6-3.9h2.6A5 5 0 1 0 17 14h2a7 7 0 1 1-7-9z"/></svg>
           </button>
@@ -56,7 +63,7 @@
       <pre id="status" class="status auth-only" hidden></pre>
       <div id="noticeModal" class="notice-modal" hidden>
         <div class="notice-dialog">
-          <h3>Notification</h3>
+          <h3 id="noticeTitle">Notification</h3>
           <p id="noticeMessage"></p>
           <div class="notice-actions">
             <button id="noticeClose" class="ghost">Close</button>
@@ -65,7 +72,7 @@
       </div>
       <div id="confirmModal" class="notice-modal" hidden>
         <div class="notice-dialog">
-          <h3>Confirm Action</h3>
+          <h3 id="confirmTitle">Confirm Action</h3>
           <p id="confirmMessage"></p>
           <div class="notice-actions confirm-actions">
             <button id="confirmCancel" class="ghost">Cancel</button>
@@ -75,7 +82,7 @@
       </div>
       <div id="registerModal" class="notice-modal" hidden>
         <div class="notice-dialog">
-          <h3>Create Account</h3>
+          <h3 id="registerTitle">Create Account</h3>
           <div class="grid-3">
             <input id="registerEmail" type="email" placeholder="Email" />
             <input id="registerPassword" type="password" placeholder="Password (min 8 chars)" />
@@ -90,8 +97,8 @@
       </div>
       <div id="forcePasswordModal" class="notice-modal" hidden>
         <div class="notice-dialog">
-          <h3>Change Password Required</h3>
-          <p>For security, you must change your temporary password before continuing.</p>
+          <h3 id="forcePasswordTitle">Change Password Required</h3>
+          <p id="forcePasswordHint">For security, you must change your temporary password before continuing.</p>
           <div class="grid-3">
             <input id="forceCurrentPassword" type="password" placeholder="Current Password" />
             <input id="forceNewPassword" type="password" placeholder="New Password (min 8 chars)" />
@@ -110,7 +117,7 @@
       <div id="enhanceModal" class="enhance-modal" hidden>
         <div class="enhance-dialog">
           <div class="enhance-header">
-            <h3>Image Enhancement</h3>
+            <h3 id="enhanceTitle">Image Enhancement</h3>
           </div>
 
           <div class="enhance-controls">
@@ -170,12 +177,12 @@
 
           <div class="preview-grid">
             <article class="preview-card">
-              <h3>Original</h3>
+              <h3 id="originalTitle">Original</h3>
               <div class="preview-frame"><img id="uploadedPreview" alt="Uploaded preview" /></div>
               <p id="beforeSize" class="meta-line">Size: -</p>
             </article>
             <article class="preview-card">
-              <h3>Enhanced</h3>
+              <h3 id="enhancedTitle">Enhanced</h3>
               <div class="preview-frame"><img id="completedPreview" alt="Completed preview" /></div>
               <p id="afterSize" class="meta-line">Size: -</p>
             </article>
@@ -192,13 +199,13 @@
 
       <div id="cropModal" class="crop-modal" hidden>
         <div class="crop-dialog">
-          <h3>Upoload Image</h3>
+          <h3 id="cropTitle">Upload Image</h3>
           <div class="crop-body">
             <div class="crop-image-wrap">
               <img id="cropImage" alt="Crop source" />
             </div>
             <div class="crop-preview-wrap">
-              <p>Preview</p>
+              <p id="cropPreviewTitle">Preview</p>
               <div id="cropPreview" class="crop-preview"></div>
             </div>
           </div>
