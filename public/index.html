@@ -4,57 +4,215 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Image Restore Studio</title>
-    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.css" />
+    <link rel="stylesheet" href="/styles.css?v=__ASSET_VERSION__" />
   </head>
   <body>
-    <main>
-      <h1>Image Restore Studio</h1>
-      <p class="muted">Lotus-style backend: auth, upload, process, download.</p>
+    <main class="app-shell">
+      <header class="hero">
+        <h1>Image Restore Studio</h1>
+        <p>Upload, restore, compare, and download your photos.</p>
+      </header>
 
-      <section>
-        <h2>Auth</h2>
-        <input id="email" type="email" placeholder="email" />
-        <input id="password" type="password" placeholder="password" />
-        <button id="register">Register</button>
-        <button id="login">Login</button>
-        <button id="logout">Logout</button>
+      <section id="panelAccount" class="panel">
+        <div id="accountHead" class="account-head">
+          <h2>Account</h2>
+          <button id="register" class="ghost subtle-btn">Register</button>
+        </div>
+        <div id="authGuest" class="grid-3">
+          <input id="email" type="email" placeholder="Email" />
+          <input id="password" type="password" placeholder="Password" />
+          <div class="btn-row">
+            <button id="login">Login</button>
+          </div>
+        </div>
+        <p id="authMessage" class="auth-message" hidden></p>
+        <div id="authUser" class="account-user" hidden>
+          <span id="accountLabel"></span>
+          <div class="account-actions">
+            <a id="adminLink" class="ghost admin-link" href="/admin.html" hidden>Admin</a>
+            <button id="logout" class="danger">Logout</button>
+          </div>
+        </div>
       </section>
 
-      <section>
-        <h2>Upload</h2>
-        <input id="photo" type="file" accept="image/*" />
-        <button id="upload">Upload</button>
+      <section id="panelUpload" class="panel auth-only">
+        <h2>Upload Image</h2>
+        <div class="grid-3">
+          <input id="photo" type="file" accept="image/*" />
+        </div>
       </section>
 
-      <section>
-        <h2>Process</h2>
-        <input id="imageId" type="number" placeholder="image id" />
-        <label><input id="upscale" type="checkbox" /> Real-ESRGAN 4x</label>
-        <label><input id="face" type="checkbox" /> GFPGAN face restore</label>
-        <label><input id="colorize" type="checkbox" /> DeOldify colorize</label>
-        <label><input id="sharpen" type="checkbox" /> Sharpen</label>
-        <label><input id="denoise" type="checkbox" /> Denoise</label>
-        <input id="contrast" type="number" step="0.1" value="1" placeholder="contrast" />
-        <input id="saturation" type="number" step="0.1" value="1" placeholder="saturation" />
-        <input id="gamma" type="number" step="0.1" value="1" placeholder="gamma" />
-        <button id="process">Run</button>
+      <section id="panelImages" class="panel auth-only">
+        <div class="panel-head">
+          <h2>Your Images</h2>
+          <button id="refresh" class="icon-btn ghost" aria-label="Refresh Library" title="Refresh Library">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5a7 7 0 0 1 6.65 4.8H21l-3.4 3.9-3.6-3.9h2.6A5 5 0 1 0 17 14h2a7 7 0 1 1-7-9z"/></svg>
+          </button>
+        </div>
+        <ul id="images" class="image-list"></ul>
       </section>
 
-      <section>
-        <h2>Images</h2>
-        <button id="refresh">Refresh</button>
-        <ul id="images"></ul>
-      </section>
+      <pre id="status" class="status auth-only" hidden></pre>
+      <div id="noticeModal" class="notice-modal" hidden>
+        <div class="notice-dialog">
+          <h3>Notification</h3>
+          <p id="noticeMessage"></p>
+          <div class="notice-actions">
+            <button id="noticeClose" class="ghost">Close</button>
+          </div>
+        </div>
+      </div>
+      <div id="confirmModal" class="notice-modal" hidden>
+        <div class="notice-dialog">
+          <h3>Confirm Action</h3>
+          <p id="confirmMessage"></p>
+          <div class="notice-actions confirm-actions">
+            <button id="confirmCancel" class="ghost">Cancel</button>
+            <button id="confirmOk" class="danger">Confirm</button>
+          </div>
+        </div>
+      </div>
+      <div id="registerModal" class="notice-modal" hidden>
+        <div class="notice-dialog">
+          <h3>Create Account</h3>
+          <div class="grid-3">
+            <input id="registerEmail" type="email" placeholder="Email" />
+            <input id="registerPassword" type="password" placeholder="Password (min 8 chars)" />
+            <input id="registerPasswordConfirm" type="password" placeholder="Confirm Password" />
+          </div>
+          <p id="registerMessage" class="auth-message" hidden></p>
+          <div class="notice-actions confirm-actions">
+            <button id="registerCancel" class="ghost">Cancel</button>
+            <button id="registerSubmit">Register</button>
+          </div>
+        </div>
+      </div>
+      <div id="forcePasswordModal" class="notice-modal" hidden>
+        <div class="notice-dialog">
+          <h3>Change Password Required</h3>
+          <p>For security, you must change your temporary password before continuing.</p>
+          <div class="grid-3">
+            <input id="forceCurrentPassword" type="password" placeholder="Current Password" />
+            <input id="forceNewPassword" type="password" placeholder="New Password (min 8 chars)" />
+            <input id="forceConfirmPassword" type="password" placeholder="Confirm New Password" />
+          </div>
+          <div class="notice-actions confirm-actions">
+            <button id="forcePasswordSubmit">Update Password</button>
+            <button id="forcePasswordLogout" class="ghost">Logout</button>
+          </div>
+        </div>
+      </div>
+      <div id="versionHoverPopup" class="version-hover-popup" hidden>
+        <img id="versionHoverImage" alt="Version preview" />
+      </div>
 
-      <section>
-        <h2>Download</h2>
-        <input id="downId" type="number" placeholder="image id" />
-        <input id="downVersion" type="number" placeholder="version optional" />
-        <button id="download">Download</button>
-      </section>
+      <div id="enhanceModal" class="enhance-modal" hidden>
+        <div class="enhance-dialog">
+          <div class="enhance-header">
+            <h3>Image Enhancement</h3>
+          </div>
 
-      <pre id="status"></pre>
+          <div class="enhance-controls">
+            <div class="enhance-row top-row">
+              <label class="control-check"><input id="face" type="checkbox" checked /> Face Restore</label>
+              <label class="control-check"><input id="colorize" type="checkbox" /> Colorize (DeOldify)</label>
+              <label class="control-check"><input id="upscale" type="checkbox" /> Resize (4x)</label>
+              <label class="control-check"><input id="resize" type="checkbox" /> Resize (Custom)</label>
+
+              <label class="slider-wrap compact">
+                <span class="slider-title">Width</span>
+                <input id="targetWidth" type="number" min="1" step="1" placeholder="Width" />
+              </label>
+              <label class="slider-wrap compact">
+                <span class="slider-title">Height</span>
+                <input id="targetHeight" type="text" placeholder="auto" />
+              </label>
+            </div>
+
+            <div class="enhance-row bottom-row">
+              <label class="slider-wrap compact">
+                <span class="slider-title">Face Strength: <b id="faceStrengthValue">0.7</b></span>
+                <input id="faceStrength" type="range" min="0.1" max="1.0" step="0.1" value="0.7" />
+              </label>
+              <label class="slider-wrap compact">
+                <span class="slider-title">Sharpen: <b id="sharpenValue">0.0</b></span>
+                <input id="sharpen" type="range" min="0" max="2" step="0.1" value="0" />
+              </label>
+              <label class="slider-wrap compact">
+                <span class="slider-title">Contrast: <b id="contrastValue">1.0</b></span>
+                <input id="contrast" type="range" min="0.5" max="2.5" step="0.1" value="1" />
+              </label>
+              <label class="slider-wrap compact">
+                <span class="slider-title">Saturation: <b id="saturationValue">1.0</b></span>
+                <input id="saturation" type="range" min="0.5" max="2.5" step="0.1" value="1" />
+              </label>
+              <label class="slider-wrap compact">
+                <span class="slider-title">Brightness: <b id="gammaValue">1.0</b></span>
+                <input id="gamma" type="range" min="0.5" max="2.5" step="0.1" value="1" />
+              </label>
+              <label class="slider-wrap compact">
+                <span class="slider-title">Denoise: <b id="denoiseValue">0</b></span>
+                <input id="denoise" type="range" min="0" max="20" step="1" value="0" />
+              </label>
+            </div>
+          </div>
+
+          <div id="progressWrap" class="progress-wrap" hidden>
+            <div class="progress-head">
+              <span id="progressLabel">Processing...</span>
+              <span id="progressPercent">0%</span>
+            </div>
+            <div class="progress-track">
+              <div id="progressBar" class="progress-bar"></div>
+            </div>
+          </div>
+
+          <div class="preview-grid">
+            <article class="preview-card">
+              <h3>Original</h3>
+              <div class="preview-frame"><img id="uploadedPreview" alt="Uploaded preview" /></div>
+              <p id="beforeSize" class="meta-line">Size: -</p>
+            </article>
+            <article class="preview-card">
+              <h3>Enhanced</h3>
+              <div class="preview-frame"><img id="completedPreview" alt="Completed preview" /></div>
+              <p id="afterSize" class="meta-line">Size: -</p>
+            </article>
+          </div>
+
+          <div class="enhance-actions">
+            <button id="closeEnhanceModal" class="ghost">Cancel</button>
+            <button id="useEnhancedBtn" class="ghost">Save Enhanced Version</button>
+            <button id="resetAdjustmentsBtn" class="ghost">Reset All Settings</button>
+            <button id="process">Generate Preview</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="cropModal" class="crop-modal" hidden>
+        <div class="crop-dialog">
+          <h3>Upoload Image</h3>
+          <div class="crop-body">
+            <div class="crop-image-wrap">
+              <img id="cropImage" alt="Crop source" />
+            </div>
+            <div class="crop-preview-wrap">
+              <p>Preview</p>
+              <div id="cropPreview" class="crop-preview"></div>
+            </div>
+          </div>
+          <div class="crop-actions">
+            <button id="cropCancel" class="ghost">Cancel</button>
+            <button id="cropApply" class="ghost">Apply Crop</button>
+            <button id="cropUseOriginal">Use Original</button>
+          </div>
+        </div>
+      </div>
     </main>
-    <script src="/app.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/app.js?v=__ASSET_VERSION__"></script>
   </body>
 </html>

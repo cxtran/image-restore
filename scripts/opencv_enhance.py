@@ -16,6 +16,8 @@ def main() -> None:
     parser.add_argument('--gamma', type=float, default=1.0)
     parser.add_argument('--sharpen', default='false')
     parser.add_argument('--denoise', default='false')
+    parser.add_argument('--sharpen_amount', type=float, default=0.0)
+    parser.add_argument('--denoise_h', type=float, default=0.0)
     args = parser.parse_args()
 
     image = cv2.imread(args.input, cv2.IMREAD_COLOR)
@@ -24,12 +26,18 @@ def main() -> None:
 
     out = image.copy()
 
-    if parse_bool(args.denoise):
-      out = cv2.fastNlMeansDenoisingColored(out, None, 6, 6, 7, 21)
+    denoise_h = float(args.denoise_h)
+    if parse_bool(args.denoise) and denoise_h <= 0:
+      denoise_h = 6.0
+    if denoise_h > 0:
+      out = cv2.fastNlMeansDenoisingColored(out, None, denoise_h, denoise_h, 7, 21)
 
-    if parse_bool(args.sharpen):
-      kernel = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]])
-      out = cv2.filter2D(out, -1, kernel)
+    sharpen_amount = float(args.sharpen_amount)
+    if parse_bool(args.sharpen) and sharpen_amount <= 0:
+      sharpen_amount = 1.0
+    if sharpen_amount > 0:
+      blur = cv2.GaussianBlur(out, (0, 0), 1.2)
+      out = cv2.addWeighted(out, 1.0 + sharpen_amount, blur, -sharpen_amount, 0)
 
     if args.contrast != 1.0:
       out = cv2.convertScaleAbs(out, alpha=args.contrast, beta=0)

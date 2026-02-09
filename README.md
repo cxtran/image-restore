@@ -15,6 +15,7 @@ This app is structured similarly to `lotus-memories-db`:
   - DeOldify: colorization
   - OpenCV enhancement
   - Local fallback mode is also supported via `REALESRGAN_CMD` / `GFPGAN_CMD` / `DEOLDIFY_CMD` + Python OpenCV script
+- Live websocket progress updates during enhancement (Lotus-style progress bar)
 
 ## Local setup
 1. `cp .env.example .env`

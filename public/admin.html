@@ -1,0 +1,123 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Admin - Image Restore Studio</title>
+    <link rel="stylesheet" href="/styles.css?v=__ASSET_VERSION__" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="hero">
+        <h1>Administration</h1>
+        <p>Manage users, roles, and all images on the server.</p>
+      </header>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Admin Account</h2>
+          <button id="backToApp" class="ghost">Back to App</button>
+        </div>
+        <p id="adminIdentity" class="meta-line">Checking admin access...</p>
+      </section>
+
+      <section class="panel">
+        <h2>Add User</h2>
+        <div class="grid-3">
+          <input id="newEmail" type="email" placeholder="Email" />
+          <input id="newPassword" type="password" placeholder="Password (min 8 chars)" />
+          <select id="newRole">
+            <option value="user">user</option>
+            <option value="admin">admin</option>
+          </select>
+        </div>
+        <div class="btn-row" style="margin-top:10px;">
+          <button id="createUserBtn">Create User</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Users</h2>
+          <button id="reloadUsersBtn" class="icon-btn ghost" aria-label="Refresh Users" title="Refresh Users">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5a7 7 0 0 1 6.65 4.8H21l-3.4 3.9-3.6-3.9h2.6A5 5 0 1 0 17 14h2a7 7 0 1 1-7-9z"/></svg>
+          </button>
+        </div>
+        <div class="table-wrap">
+          <table class="admin-table" id="usersTable">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Created</th>
+                <th>Images</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>All Images</h2>
+          <button id="reloadImagesBtn" class="icon-btn ghost" aria-label="Refresh Images" title="Refresh Images">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5a7 7 0 0 1 6.65 4.8H21l-3.4 3.9-3.6-3.9h2.6A5 5 0 1 0 17 14h2a7 7 0 1 1-7-9z"/></svg>
+          </button>
+        </div>
+        <div class="table-wrap">
+          <table class="admin-table" id="imagesTable">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Original</th>
+                <th>Owner</th>
+                <th>Name</th>
+                <th>Created</th>
+                <th>Updated</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <div id="adminNotice" class="notice-modal" hidden>
+        <div class="notice-dialog">
+          <h3>Admin Notification</h3>
+          <p id="adminNoticeText"></p>
+          <div class="notice-actions">
+            <button id="adminNoticeClose" class="ghost">Close</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="adminConfirm" class="notice-modal" hidden>
+        <div class="notice-dialog">
+          <h3>Confirm Action</h3>
+          <p id="adminConfirmText"></p>
+          <div class="notice-actions confirm-actions">
+            <button id="adminConfirmCancel" class="ghost">Cancel</button>
+            <button id="adminConfirmOk" class="danger">Confirm</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="adminResetPwd" class="notice-modal" hidden>
+        <div class="notice-dialog">
+          <h3>Reset Password</h3>
+          <p id="adminResetPwdText"></p>
+          <input id="adminResetPwdInput" type="password" placeholder="New password (min 8 chars)" />
+          <div class="notice-actions confirm-actions">
+            <button id="adminResetPwdCancel" class="ghost">Cancel</button>
+            <button id="adminResetPwdOk">Save</button>
+          </div>
+        </div>
+      </div>
+    </main>
+    <script src="/admin.js?v=__ASSET_VERSION__"></script>
+  </body>
+</html>

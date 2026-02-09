@@ -23,4 +23,16 @@ async function verifyToken(req, res, next) {
   }
 }
 
-module.exports = { verifyToken };
+async function requireAdmin(req, res, next) {
+  try {
+    const [rows] = await db.query('SELECT role FROM users WHERE id = ? LIMIT 1', [req.user.id]);
+    const role = rows[0]?.role || 'user';
+    if (role !== 'admin') return res.status(403).json({ message: 'Admin access required' });
+    req.user.role = role;
+    return next();
+  } catch (error) {
+    return res.status(500).json({ message: 'Role check failed', error: error.message });
+  }
+}
+
+module.exports = { verifyToken, requireAdmin };
