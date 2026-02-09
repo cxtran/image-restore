@@ -5,7 +5,7 @@ services:
 
     # Install dependencies only once (node_modules persisted via volume).
     # If package-lock.json changes, the deploy script will run npm ci explicitly.
-    command: sh -c "test -d node_modules || npm ci --omit=dev; npm start"
+    command: sh -c "test -f node_modules/.installed || npm ci --omit=dev && touch node_modules/.installed; npm start"
 
     restart: unless-stopped
     extra_hosts:
