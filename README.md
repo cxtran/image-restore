@@ -40,3 +40,9 @@ Example:
 
 ## Hetzner deployment
 Use `docker-compose.yml` on your Hetzner VM. Set strong secrets and DB passwords before deploy.
+
+### Recommended Hetzner env file
+1. Copy template: `cp .env.hetzner.example .env.hetzner`
+2. Edit `.env.hetzner` with your Hetzner values (especially `JWT_SECRET`, `DB_*`, `ESRGAN_URL`)
+3. Run:
+   - `docker compose --env-file .env.hetzner up -d --build`
