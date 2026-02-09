@@ -1,0 +1,129 @@
+name: Deploy delta to Hetzner (code-only + delete list)
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy_delta:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout (full history so diff works)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build patch bundle + delete list
+        id: patch
+        run: |
+          set -e
+
+          BEFORE="${{ github.event.before }}"
+          AFTER="${{ github.sha }}"
+
+          echo "Diff: $BEFORE..$AFTER"
+
+          # Collect file changes with status (A/M/D/R)
+          git diff --name-status "$BEFORE" "$AFTER" > name_status.txt || true
+
+          echo "Name-status:"
+          cat name_status.txt || true
+
+          # delete list:
+          # - D <path>         => delete <path>
+          # - Rxxx old new     => delete old (new file will be included in patch)
+          awk '
+            $1 ~ /^D/ { print $2 }
+            $1 ~ /^R/ { print $2 }
+          ' name_status.txt > delete_raw.txt || true
+
+          # patch list (files to copy):
+          # - A <path>
+          # - M <path>
+          # - Rxxx old new     => copy new path ($3)
+          awk '
+            $1 ~ /^A/ { print $2 }
+            $1 ~ /^M/ { print $2 }
+            $1 ~ /^R/ { print $3 }
+          ' name_status.txt > changed_raw.txt || true
+
+          # Exclude items we never deploy
+          # (adjust if you want to deploy deploy/ docs etc)
+          EXCLUDE_REGEX='^(uploads/|node_modules/|\.env$|\.env\.|\.git/|\.github/)'
+          grep -vE "$EXCLUDE_REGEX" changed_raw.txt > changed_filtered.txt || true
+          grep -vE "$EXCLUDE_REGEX" delete_raw.txt > delete.txt || true
+
+          # Dependencies changed?
+          NEEDS_NPM=0
+          if grep -E '^(package\.json|package-lock\.json)$' changed_raw.txt >/dev/null 2>&1; then
+            NEEDS_NPM=1
+          fi
+
+          echo "Deployable changed files:"
+          cat changed_filtered.txt || true
+
+          echo "Deployable deleted files:"
+          cat delete.txt || true
+
+          HAS_PATCH=0
+          if [ -s changed_filtered.txt ]; then
+            tar -czf patch.tgz -T changed_filtered.txt
+            HAS_PATCH=1
+          fi
+
+          HAS_DELETES=0
+          if [ -s delete.txt ]; then
+            HAS_DELETES=1
+          fi
+
+          echo "needs_npm=$NEEDS_NPM" >> $GITHUB_OUTPUT
+          echo "has_patch=$HAS_PATCH" >> $GITHUB_OUTPUT
+          echo "has_deletes=$HAS_DELETES" >> $GITHUB_OUTPUT
+
+      - name: Prepare remote temp folder
+        if: steps.patch.outputs.has_patch == '1' || steps.patch.outputs.has_deletes == '1'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: ${{ secrets.HETZNER_USER }}
+          key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.HETZNER_SSH_PORT }}
+          script: |
+            set -e
+            mkdir -p /tmp/image-restore-deploy
+
+      - name: Upload patch + delete list
+        if: steps.patch.outputs.has_patch == '1' || steps.patch.outputs.has_deletes == '1'
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: ${{ secrets.HETZNER_USER }}
+          key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.HETZNER_SSH_PORT }}
+          source: "patch.tgz,delete.txt"
+          target: "/tmp/image-restore-deploy"
+
+      - name: Apply patch + deletes on Hetzner
+        if: steps.patch.outputs.has_patch == '1' || steps.patch.outputs.has_deletes == '1'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: ${{ secrets.HETZNER_USER }}
+          key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.HETZNER_SSH_PORT }}
+          script: |
+            set -e
+            NEEDS_NPM="${{ steps.patch.outputs.needs_npm }}"
+            cd /srv/docker/image-restore
+
+            # If patch.tgz doesn't exist (delete-only change), create an empty tarball so deploy script can run.
+            if [ -f /tmp/image-restore-deploy/patch.tgz ]; then
+              PATCH="/tmp/image-restore-deploy/patch.tgz"
+            else
+              PATCH="/tmp/image-restore-deploy/empty_patch.tgz"
+              mkdir -p /tmp/image-restore-deploy/empty
+              tar -czf "$PATCH" -C /tmp/image-restore-deploy/empty .
+            fi
+
+            ./deploy_patch.sh "$PATCH" "$NEEDS_NPM" "/tmp/image-restore-deploy/delete.txt"
