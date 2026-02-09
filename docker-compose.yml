@@ -2,12 +2,17 @@ services:
   app:
     image: node:20-bookworm
     working_dir: /app
-    command: sh -c "npm install && npm start"
+
+    # Install dependencies only once (node_modules persisted via volume).
+    # If package-lock.json changes, the deploy script will run npm ci explicitly.
+    command: sh -c "test -d node_modules || npm ci --omit=dev; npm start"
+
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
       - "4011:4011"
+
     environment:
       PORT: ${PORT:-4011}
       NODE_ENV: ${NODE_ENV:-production}
@@ -23,9 +28,17 @@ services:
       GFPGAN_CMD: ${GFPGAN_CMD:-}
       DEOLDIFY_CMD: ${DEOLDIFY_CMD:-}
       PYTHON_BIN: ${PYTHON_BIN:-python3}
+
     volumes:
+      # Your production code lives in /srv/docker/image-restore (bind mounted)
       - ./:/app
+
+      # Persist uploads
       - uploads_data:/app/uploads
+
+      # Persist node_modules so libraries do NOT reinstall every restart
+      - node_modules_data:/app/node_modules
 
 volumes:
   uploads_data:
+  node_modules_data:
