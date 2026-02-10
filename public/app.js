@@ -78,6 +78,10 @@ const i18n = {
     resetAllSettings: 'Reset All Settings',
     generatePreview: 'Generate Preview',
     cropPreview: 'Preview',
+    rotate: 'Rotate',
+    rotateLeft: 'Rotate Left',
+    rotateRight: 'Rotate Right',
+    orientation: 'Orientation',
     applyCrop: 'Apply Crop',
     useOriginal: 'Use Original',
     signedInAs: 'Signed in as {email}',
@@ -180,6 +184,10 @@ const i18n = {
     resetAllSettings: 'Đặt lại mọi thiết lập',
     generatePreview: 'Tạo xem trước',
     cropPreview: 'Xem trước',
+    rotate: 'Xoay',
+    rotateLeft: 'Xoay trái',
+    rotateRight: 'Xoay phải',
+    orientation: 'Hướng xoay',
     applyCrop: 'Áp dụng cắt',
     useOriginal: 'Dùng ảnh gốc',
     signedInAs: 'Đăng nhập với {email}',
@@ -311,6 +319,12 @@ const cropPreviewEl = document.getElementById('cropPreview');
 const cropCancelEl = document.getElementById('cropCancel');
 const cropApplyEl = document.getElementById('cropApply');
 const cropUseOriginalEl = document.getElementById('cropUseOriginal');
+const cropRotateLeftEl = document.getElementById('cropRotateLeft');
+const cropRotateRightEl = document.getElementById('cropRotateRight');
+const cropRotateSliderEl = document.getElementById('cropRotateSlider');
+const cropRotateValueEl = document.getElementById('cropRotateValue');
+const filePickerBtnEl = document.getElementById('filePickerBtn');
+const filePickerNameEl = document.getElementById('filePickerName');
 const languageLabelEl = document.getElementById('languageLabel');
 const languageToggleEl = document.getElementById('languageToggle');
 const socket = window.io ? window.io({ withCredentials: true }) : null;
@@ -320,6 +334,7 @@ let pendingUploadFile = null;
 let pendingResizeDefaultsFromOriginal = false;
 let isRefreshingImages = false;
 let progressHideTimer = null;
+let cropRotationDeg = 0;
 const versionMenuState = {
   imageId: null,
   versionNum: null,
@@ -343,17 +358,42 @@ versionViewModalEl.hidden = true;
 versionViewModalEl.innerHTML = `
   <div class="version-view-dialog">
     <button type="button" class="version-view-close" aria-label="Close">&times;</button>
-    <img class="version-view-image" alt="Version image preview" />
+    <button type="button" class="version-view-compare" aria-label="Show original" title="Show original">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 5c5.3 0 9.7 3.8 11 7-1.3 3.2-5.7 7-11 7s-9.7-3.8-11-7c1.3-3.2 5.7-7 11-7zm0 2C8 7 4.5 9.7 3.2 12 4.5 14.3 8 17 12 17s7.5-2.7 8.8-5C19.5 9.7 16 7 12 7zm0 2.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5z"/>
+      </svg>
+    </button>
+    <img class="version-view-image version-view-image-base" alt="Version image preview" />
+    <img class="version-view-image version-view-image-overlay" alt="Original image preview" hidden />
   </div>
 `;
 document.body.appendChild(versionViewModalEl);
-const versionViewImageEl = versionViewModalEl.querySelector('.version-view-image');
+const versionViewImageEl = versionViewModalEl.querySelector('.version-view-image-base');
+const versionViewOverlayImageEl = versionViewModalEl.querySelector('.version-view-image-overlay');
 const versionViewCloseEl = versionViewModalEl.querySelector('.version-view-close');
+const versionViewCompareEl = versionViewModalEl.querySelector('.version-view-compare');
 const versionMenuDeleteBtnEl = versionContextMenuEl.querySelector('button[data-action="delete"]');
 const versionMenuMetaEl = versionContextMenuEl.querySelector('[data-meta]');
+const versionViewState = {
+  enhancedPath: '',
+  originalPath: '',
+  showingOriginal: false,
+  enhancedDims: null,
+  originalDims: null
+};
 const imageDimsCache = new Map();
 let confirmResolver = null;
 let forcePasswordRequired = false;
+const filePickerText = {
+  en: {
+    chooseFile: 'Choose File',
+    noFileChosen: 'No file chosen'
+  },
+  vi: {
+    chooseFile: 'Chọn ảnh',
+    noFileChosen: 'Chưa chọn ảnh'
+  }
+};
 
 function syncUseEnhancedButton() {
   if (!useEnhancedBtnEl) return;
@@ -395,6 +435,8 @@ function applyLanguage() {
   setText('adminLink', 'admin');
   setText('logout', 'logout');
   setText('uploadTitle', 'uploadImage');
+  if (filePickerBtnEl) filePickerBtnEl.textContent = getFilePickerText('chooseFile');
+  updateFilePickerLabel(photoInputEl?.files?.[0] || null);
   setText('yourImagesTitle', 'yourImages');
   setText('noticeTitle', 'notification');
   setText('noticeClose', 'close');
@@ -417,6 +459,14 @@ function applyLanguage() {
   setText('process', 'generatePreview');
   setText('cropTitle', 'uploadImage');
   setText('cropPreviewTitle', 'cropPreview');
+  setText('cropRotateLabel', 'rotate');
+  setText('cropRotateLeft', 'rotateLeft');
+  setText('cropRotateRight', 'rotateRight');
+  if (cropRotateValueEl) cropRotateValueEl.textContent = `${Math.round(Number(cropRotationDeg) || 0)}°`;
+  const cropOrientationLabelEl = document.getElementById('cropOrientationLabel');
+  if (cropOrientationLabelEl) {
+    cropOrientationLabelEl.childNodes[0].nodeValue = `${t('orientation')}: `;
+  }
   setText('cropCancel', 'cancel');
   setText('cropApply', 'applyCrop');
   setText('cropUseOriginal', 'useOriginal');
@@ -450,6 +500,7 @@ function applyLanguage() {
   if (versionHoverImage) versionHoverImage.alt = t('enhanced');
   if (versionViewCloseEl) versionViewCloseEl.setAttribute('aria-label', t('close'));
   if (versionViewImageEl) versionViewImageEl.alt = t('enhanced');
+  if (versionViewOverlayImageEl) versionViewOverlayImageEl.alt = t('original');
 
   const viewBtn = versionContextMenuEl.querySelector('button[data-action="view"]');
   const downloadBtn = versionContextMenuEl.querySelector('button[data-action="download"]');
@@ -646,6 +697,7 @@ function setAuthUI(user) {
     closeEnhanceModal();
     pendingUploadFile = null;
     photoInputEl.value = '';
+    updateFilePickerLabel(null);
   }
   if (loggedIn && forcePasswordRequired) {
     forcePasswordModalEl.hidden = false;
@@ -830,15 +882,96 @@ function loadImageDimensions(filePath) {
   });
 }
 
-function openVersionViewModal(filePath) {
+function getFilePickerText(key) {
+  const pack = filePickerText[currentLang] || filePickerText.en;
+  return pack[key] || filePickerText.en[key] || key;
+}
+
+function updateFilePickerLabel(file) {
+  if (!filePickerNameEl) return;
+  filePickerNameEl.textContent = (file && file.name) ? String(file.name) : getFilePickerText('noFileChosen');
+}
+
+function getImageRowById(imageId) {
+  const n = Number(imageId);
+  return state.images.find((row) => Number(row.id) === n) || null;
+}
+
+function getOriginalPathForImage(imageId) {
+  const row = getImageRowById(imageId);
+  if (!row) return '';
+  const v1 = (row.versions || []).find((v) => Number(v.version_num) === 1);
+  return row.original_path || v1?.file_path || row.current_path || '';
+}
+
+function isOriginalSmallerThanEnhanced() {
+  const enhanced = versionViewState.enhancedDims;
+  const original = versionViewState.originalDims;
+  if (!enhanced || !original) return false;
+  return original.width < enhanced.width && original.height < enhanced.height;
+}
+
+function setVersionViewOverlayActive(active) {
+  const canOverlay = isOriginalSmallerThanEnhanced() && Boolean(versionViewState.originalPath);
+  const show = Boolean(active && canOverlay);
+  versionViewModalEl.classList.toggle('version-view-overlay-active', show);
+  if (versionViewOverlayImageEl) versionViewOverlayImageEl.hidden = !show;
+}
+
+function setVersionViewSource(showOriginal) {
+  const wantOriginal = Boolean(showOriginal && versionViewState.originalPath);
+  versionViewState.showingOriginal = wantOriginal;
+  setVersionViewOverlayActive(false);
+  const nextSrc = wantOriginal ? versionViewState.originalPath : versionViewState.enhancedPath;
+  if (!nextSrc) return;
+  if (versionViewImageEl.src !== nextSrc) {
+    versionViewImageEl.src = nextSrc;
+  }
+}
+
+function openVersionViewModal(filePath, originalPath = '') {
   if (!filePath) return;
+  versionViewState.enhancedPath = filePath;
+  versionViewState.originalPath = originalPath;
+  versionViewState.showingOriginal = false;
+  versionViewState.enhancedDims = null;
+  versionViewState.originalDims = null;
   versionViewImageEl.src = filePath;
+  if (versionViewCompareEl) {
+    const canCompare = Boolean(originalPath && originalPath !== filePath);
+    versionViewCompareEl.hidden = !canCompare;
+  }
+  if (versionViewOverlayImageEl) {
+    versionViewOverlayImageEl.src = originalPath || '';
+    versionViewOverlayImageEl.hidden = true;
+  }
+  versionViewModalEl.classList.remove('version-view-overlay-active');
+  if (originalPath) {
+    Promise.all([loadImageDimensions(filePath), loadImageDimensions(originalPath)]).then(([enhanced, original]) => {
+      if (versionViewState.enhancedPath !== filePath || versionViewState.originalPath !== originalPath) return;
+      versionViewState.enhancedDims = enhanced;
+      versionViewState.originalDims = original;
+    });
+  }
   versionViewModalEl.hidden = false;
 }
 
 function closeVersionViewModal() {
+  versionViewState.enhancedPath = '';
+  versionViewState.originalPath = '';
+  versionViewState.showingOriginal = false;
+  versionViewState.enhancedDims = null;
+  versionViewState.originalDims = null;
+  versionViewModalEl.classList.remove('version-view-overlay-active');
   versionViewModalEl.hidden = true;
   versionViewImageEl.src = '';
+  if (versionViewCompareEl) {
+    versionViewCompareEl.hidden = true;
+  }
+  if (versionViewOverlayImageEl) {
+    versionViewOverlayImageEl.hidden = true;
+    versionViewOverlayImageEl.src = '';
+  }
 }
 
 function showVersionMenu(imageId, versionNum, filePath, sizeBytes, event) {
@@ -923,6 +1056,7 @@ function openCropModal(imageUrl) {
     preview: cropPreviewEl,
     responsive: true
   });
+  setCropRotation(0);
 }
 
 function closeCropModal() {
@@ -931,6 +1065,15 @@ function closeCropModal() {
     cropper.destroy();
     cropper = null;
   }
+}
+
+function setCropRotation(nextDeg) {
+  const numeric = Number(nextDeg);
+  const clamped = Math.max(-180, Math.min(180, Number.isFinite(numeric) ? numeric : 0));
+  cropRotationDeg = Math.round(clamped);
+  if (cropRotateSliderEl) cropRotateSliderEl.value = String(cropRotationDeg);
+  if (cropRotateValueEl) cropRotateValueEl.textContent = `${cropRotationDeg}°`;
+  if (cropper) cropper.rotateTo(cropRotationDeg);
 }
 
 async function deleteImage(imageId) {
@@ -950,7 +1093,7 @@ async function deleteImage(imageId) {
   }
 
   await refreshImages();
-  log(t('deletedImage', { name: imageName }), { popup: true });
+  log(t('deletedImage', { name: imageName }));
 }
 
 async function deleteSelectedEnhancedVersions(imageId, versions = []) {
@@ -1043,7 +1186,8 @@ function renderImageList() {
       chip.onclick = (e) => {
         e.preventDefault();
         e.stopPropagation();
-        openVersionViewModal(v.file_path);
+        const originalPath = Number(v.version_num) > 1 ? getOriginalPathForImage(row.id) : '';
+        openVersionViewModal(v.file_path, originalPath);
       };
       chip.oncontextmenu = (e) => {
         e.preventDefault();
@@ -1184,6 +1328,7 @@ async function uploadPendingOrSelectedFile() {
   renderPreviews();
   pendingUploadFile = null;
   photoInputEl.value = '';
+  updateFilePickerLabel(null);
 
   log(t('uploaded', { name: file.name || t('imageWord') }));
   await refreshImages();
@@ -1249,27 +1394,28 @@ async function refreshImages() {
   if (isRefreshingImages) return;
   isRefreshingImages = true;
   try {
-  const data = await api('/api/images');
-  const previousOrder = new Map(state.images.map((img, idx) => [Number(img.id), idx]));
-  state.images = [...data].sort((a, b) => {
-    const aIdx = previousOrder.has(Number(a.id)) ? previousOrder.get(Number(a.id)) : Number.MAX_SAFE_INTEGER;
-    const bIdx = previousOrder.has(Number(b.id)) ? previousOrder.get(Number(b.id)) : Number.MAX_SAFE_INTEGER;
-    if (aIdx !== bIdx) return aIdx - bIdx;
-    return 0;
-  });
-  renderImageList();
+    const data = await api('/api/images');
+    state.images = [...data].sort((a, b) => {
+      const aTs = new Date(a.created_at || 0).getTime();
+      const bTs = new Date(b.created_at || 0).getTime();
+      if (Number.isFinite(aTs) && Number.isFinite(bTs) && aTs !== bTs) {
+        return bTs - aTs;
+      }
+      return Number(b.id || 0) - Number(a.id || 0);
+    });
+    renderImageList();
 
-  if (state.selectedImageId) {
-    const selected = state.images.find((x) => x.id === state.selectedImageId);
-    if (selected) {
-      const keepPendingPreview = !enhanceModalEl.hidden && Boolean(state.pendingEnhancedPath);
-      setSelectedImage(selected, { preservePendingPreview: keepPendingPreview });
+    if (state.selectedImageId) {
+      const selected = state.images.find((x) => x.id === state.selectedImageId);
+      if (selected) {
+        const keepPendingPreview = !enhanceModalEl.hidden && Boolean(state.pendingEnhancedPath);
+        setSelectedImage(selected, { preservePendingPreview: keepPendingPreview });
+      }
     }
-  }
 
-  if (!state.selectedImageId && state.images.length > 0) {
-    setSelectedImage(state.images[0]);
-  }
+    if (!state.selectedImageId && state.images.length > 0) {
+      setSelectedImage(state.images[0]);
+    }
   } finally {
     isRefreshingImages = false;
   }
@@ -1313,6 +1459,7 @@ useEnhancedBtnEl.addEventListener('click', () => {
 
 photoInputEl.addEventListener('change', () => {
   const file = photoInputEl.files[0];
+  updateFilePickerLabel(file || null);
   if (!file) return;
   const objectUrl = URL.createObjectURL(file);
   openCropModal(objectUrl);
@@ -1321,6 +1468,7 @@ photoInputEl.addEventListener('change', () => {
 cropCancelEl.addEventListener('click', () => {
   closeCropModal();
   photoInputEl.value = '';
+  updateFilePickerLabel(null);
   pendingUploadFile = null;
 });
 
@@ -1357,6 +1505,24 @@ cropUseOriginalEl.addEventListener('click', () => {
   uploadPendingOrSelectedFile().catch((e) => log(e.message));
 });
 
+if (cropRotateLeftEl) {
+  cropRotateLeftEl.addEventListener('click', () => {
+    setCropRotation(cropRotationDeg - 90);
+  });
+}
+
+if (cropRotateRightEl) {
+  cropRotateRightEl.addEventListener('click', () => {
+    setCropRotation(cropRotationDeg + 90);
+  });
+}
+
+if (cropRotateSliderEl) {
+  cropRotateSliderEl.addEventListener('input', () => {
+    setCropRotation(cropRotateSliderEl.value);
+  });
+}
+
 document.addEventListener('scroll', hideVersionMenu, true);
 window.addEventListener('resize', hideVersionMenu);
 document.addEventListener('click', (e) => {
@@ -1381,7 +1547,8 @@ versionContextMenuEl.addEventListener('click', async (e) => {
     if (!imageId || !versionNum) return;
     if (action === 'view') {
       if (!filePath) throw new Error(t('versionFileMissing'));
-      openVersionViewModal(filePath);
+      const originalPath = versionNum > 1 ? getOriginalPathForImage(imageId) : '';
+      openVersionViewModal(filePath, originalPath);
       return;
     }
     if (action === 'download') {
@@ -1408,6 +1575,24 @@ versionContextMenuEl.addEventListener('click', async (e) => {
 });
 
 versionViewCloseEl.addEventListener('click', closeVersionViewModal);
+versionViewCompareEl.addEventListener('mouseenter', () => {
+  if (versionViewModalEl.hidden) return;
+  if (!versionViewState.originalPath) return;
+  if (versionViewState.originalPath === versionViewState.enhancedPath) return;
+  if (isOriginalSmallerThanEnhanced()) {
+    setVersionViewOverlayActive(true);
+    return;
+  }
+  setVersionViewSource(true);
+});
+versionViewCompareEl.addEventListener('mouseleave', () => {
+  if (versionViewModalEl.hidden) return;
+  if (isOriginalSmallerThanEnhanced()) {
+    setVersionViewOverlayActive(false);
+    return;
+  }
+  setVersionViewSource(false);
+});
 versionViewModalEl.addEventListener('click', (e) => {
   if (e.target === versionViewModalEl) closeVersionViewModal();
 });
@@ -1442,6 +1627,10 @@ uploadedPreviewEl.addEventListener('load', () => {
 completedPreviewEl.addEventListener('load', () => {
   state.afterDims = { width: completedPreviewEl.naturalWidth, height: completedPreviewEl.naturalHeight };
   updatePreviewSizeLabels();
+});
+completedPreviewEl.addEventListener('click', () => {
+  if (!state.completedPreviewUrl) return;
+  openVersionViewModal(state.completedPreviewUrl);
 });
 
 if (languageToggleEl) {

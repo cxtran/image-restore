@@ -46,7 +46,11 @@
       <section id="panelUpload" class="panel auth-only">
         <h2 id="uploadTitle">Upload Image</h2>
         <div class="grid-3">
-          <input id="photo" type="file" accept="image/*" />
+          <div class="file-picker">
+            <label id="filePickerBtn" for="photo" class="ghost">Choose File</label>
+            <span id="filePickerName">No file chosen</span>
+            <input id="photo" type="file" accept="image/*" class="file-input-hidden" />
+          </div>
         </div>
       </section>
 
@@ -60,7 +64,6 @@
         <ul id="images" class="image-list"></ul>
       </section>
 
-      <pre id="status" class="status auth-only" hidden></pre>
       <div id="noticeModal" class="notice-modal" hidden>
         <div class="notice-dialog">
           <h3 id="noticeTitle">Notification</h3>
@@ -208,6 +211,15 @@
               <p id="cropPreviewTitle">Preview</p>
               <div id="cropPreview" class="crop-preview"></div>
             </div>
+          </div>
+          <div class="crop-tools">
+            <span id="cropRotateLabel" class="crop-tools-label">Rotate</span>
+            <button id="cropRotateLeft" type="button" class="ghost">Rotate Left</button>
+            <button id="cropRotateRight" type="button" class="ghost">Rotate Right</button>
+            <label class="crop-rotate-slider-wrap" for="cropRotateSlider">
+              <span id="cropOrientationLabel" class="crop-tools-label">Orientation: <b id="cropRotateValue">0°</b></span>
+              <input id="cropRotateSlider" type="range" min="-180" max="180" step="1" value="0" />
+            </label>
           </div>
           <div class="crop-actions">
             <button id="cropCancel" class="ghost">Cancel</button>
