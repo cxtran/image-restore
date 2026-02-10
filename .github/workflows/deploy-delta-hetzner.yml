@@ -49,16 +49,9 @@ jobs:
           ' name_status.txt > changed_raw.txt || true
 
           # Exclude items we never deploy
-          # (adjust if you want to deploy deploy/ docs etc)
           EXCLUDE_REGEX='^(uploads/|node_modules/|\.env$|\.env\.|\.git/|\.github/)'
           grep -vE "$EXCLUDE_REGEX" changed_raw.txt > changed_filtered.txt || true
           grep -vE "$EXCLUDE_REGEX" delete_raw.txt > delete.txt || true
-
-          # Dependencies changed?
-          NEEDS_NPM=0
-          if grep -E '^(package\.json|package-lock\.json)$' changed_raw.txt >/dev/null 2>&1; then
-            NEEDS_NPM=1
-          fi
 
           echo "Deployable changed files:"
           cat changed_filtered.txt || true
@@ -77,7 +70,6 @@ jobs:
             HAS_DELETES=1
           fi
 
-          echo "needs_npm=$NEEDS_NPM" >> $GITHUB_OUTPUT
           echo "has_patch=$HAS_PATCH" >> $GITHUB_OUTPUT
           echo "has_deletes=$HAS_DELETES" >> $GITHUB_OUTPUT
 
@@ -114,7 +106,6 @@ jobs:
           port: ${{ secrets.HETZNER_SSH_PORT }}
           script: |
             set -e
-            NEEDS_NPM="${{ steps.patch.outputs.needs_npm }}"
             cd /srv/docker/image-restore
 
             # If patch.tgz doesn't exist (delete-only change), create an empty tarball so deploy script can run.
@@ -126,4 +117,6 @@ jobs:
               tar -czf "$PATCH" -C /tmp/image-restore-deploy/empty .
             fi
 
-            ./deploy_patch.sh "$PATCH" "$NEEDS_NPM" "/tmp/image-restore-deploy/delete.txt"
+            # IMPORTANT: ensure this filename matches what exists on Hetzner:
+            # - if your server has deploy-patch.sh, either rename it or change the line below.
+            ./deploy_patch.sh "$PATCH" "/tmp/image-restore-deploy/delete.txt"
