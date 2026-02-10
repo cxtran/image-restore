@@ -34,16 +34,26 @@ function relPathToAbs(relPath) {
 }
 
 function deleteFilesIfPresent(paths = []) {
-  paths.forEach((relPath) => {
+  const failed = [];
+  const deleted = [];
+  const uniquePaths = Array.from(new Set(paths.filter(Boolean)));
+  uniquePaths.forEach((relPath) => {
     if (!relPath) return;
     const absPath = relPathToAbs(relPath);
+    const uploadRoot = uploadDir.endsWith(path.sep) ? uploadDir : `${uploadDir}${path.sep}`;
+    if (!(absPath === uploadDir || absPath.startsWith(uploadRoot))) {
+      failed.push({ path: relPath, error: 'Path is outside upload directory' });
+      return;
+    }
     if (!fs.existsSync(absPath)) return;
     try {
       fs.unlinkSync(absPath);
-    } catch (_error) {
-      // Ignore file cleanup failures, DB updates already succeeded.
+      deleted.push(relPath);
+    } catch (error) {
+      failed.push({ path: relPath, error: error.message });
     }
   });
+  return { deleted, failed };
 }
 
 exports.uploadPhoto = async (req, res) => {
@@ -192,11 +202,54 @@ exports.processImage = async (req, res) => {
       onProgress: (progress, message) => emitProgress(progress, message)
     });
 
+    const previewSizeBytes = getFileSizeBytesFromRelPath(outRel);
     emitProgress(100, 'Completed', { preview_path: outRel, done: true });
-    return res.json({ imageId, preview_path: outRel, path: outRel, message: 'Preview generated. Use Enhanced Image to save.' });
+    return res.json({
+      imageId,
+      preview_path: outRel,
+      path: outRel,
+      preview_size_bytes: previewSizeBytes,
+      message: 'Preview generated. Use Enhanced Image to save.'
+    });
   } catch (error) {
     emitProgress(-1, error.message || 'Processing failed', { error: true });
     return res.status(400).json({ message: 'Processing failed', error: error.message });
+  }
+};
+
+exports.discardPreviewImage = async (req, res) => {
+  const imageId = Number(req.params.id);
+  const previewPath = String(req.body?.preview_path || '');
+  if (!previewPath || !previewPath.startsWith('/uploads/')) {
+    return res.status(400).json({ message: 'preview_path is required and must be under /uploads/' });
+  }
+
+  try {
+    const [rows] = await db.query('SELECT * FROM images WHERE id = ? AND user_id = ?', [imageId, req.user.id]);
+    const image = rows[0];
+    if (!image) return res.status(404).json({ message: 'Image not found' });
+
+    const fileName = path.basename(previewPath);
+    if (!fileName.startsWith(`${imageId}-preview-`)) {
+      return res.status(400).json({ message: 'Invalid preview_path for this image' });
+    }
+    if (previewPath === image.original_path || previewPath === image.current_path) {
+      return res.status(400).json({ message: 'Refusing to delete original/current image path' });
+    }
+
+    const absPath = relPathToAbs(previewPath);
+    const uploadRoot = uploadDir.endsWith(path.sep) ? uploadDir : `${uploadDir}${path.sep}`;
+    if (!(absPath === uploadDir || absPath.startsWith(uploadRoot))) {
+      return res.status(400).json({ message: 'Invalid preview path location' });
+    }
+
+    if (!fs.existsSync(absPath)) {
+      return res.json({ message: 'Preview already absent', imageId, deleted: false });
+    }
+    fs.unlinkSync(absPath);
+    return res.json({ message: 'Preview deleted', imageId, deleted: true });
+  } catch (error) {
+    return res.status(500).json({ message: 'Discard preview failed', error: error.message });
   }
 };
 
@@ -273,11 +326,18 @@ exports.deleteImage = async (req, res) => {
     pathsToDelete.add(image.current_path);
     versions.forEach((v) => pathsToDelete.add(v.file_path));
 
+    const cleanup = deleteFilesIfPresent(Array.from(pathsToDelete));
+    if (cleanup.failed.length) {
+      return res.status(500).json({
+        message: 'Image files could not be deleted from server',
+        imageId,
+        failed_files: cleanup.failed
+      });
+    }
+
     await db.query('DELETE FROM images WHERE id = ? AND user_id = ?', [imageId, req.user.id]);
 
-    deleteFilesIfPresent(Array.from(pathsToDelete));
-
-    return res.json({ message: 'Image deleted', imageId });
+    return res.json({ message: 'Image deleted', imageId, deleted_files: cleanup.deleted.length });
   } catch (error) {
     return res.status(500).json({ message: 'Delete failed', error: error.message });
   }

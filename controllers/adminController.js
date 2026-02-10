@@ -2,22 +2,33 @@ const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcrypt');
 const db = require('../db');
+const uploadDir = path.resolve(process.env.UPLOAD_DIR || './uploads');
 
 function relPathToAbs(relPath) {
   return path.resolve('.', String(relPath || '').replace(/^\//, ''));
 }
 
 function deleteFilesIfPresent(paths = []) {
-  paths.forEach((relPath) => {
+  const failed = [];
+  const deleted = [];
+  const uniquePaths = Array.from(new Set(paths.filter(Boolean)));
+  uniquePaths.forEach((relPath) => {
     if (!relPath) return;
     const absPath = relPathToAbs(relPath);
+    const uploadRoot = uploadDir.endsWith(path.sep) ? uploadDir : `${uploadDir}${path.sep}`;
+    if (!(absPath === uploadDir || absPath.startsWith(uploadRoot))) {
+      failed.push({ path: relPath, error: 'Path is outside upload directory' });
+      return;
+    }
     if (!fs.existsSync(absPath)) return;
     try {
       fs.unlinkSync(absPath);
-    } catch (_error) {
-      // Ignore file cleanup failures.
+      deleted.push(relPath);
+    } catch (error) {
+      failed.push({ path: relPath, error: error.message });
     }
   });
+  return { deleted, failed };
 }
 
 exports.listUsers = async (_req, res) => {
@@ -95,9 +106,17 @@ exports.deleteUser = async (req, res) => {
     });
     versions.forEach((v) => pathsToDelete.add(v.file_path));
 
+    const cleanup = deleteFilesIfPresent(Array.from(pathsToDelete));
+    if (cleanup.failed.length) {
+      return res.status(500).json({
+        message: 'User image files could not be deleted from server',
+        userId,
+        failed_files: cleanup.failed
+      });
+    }
+
     await db.query('DELETE FROM users WHERE id = ?', [userId]);
-    deleteFilesIfPresent(Array.from(pathsToDelete));
-    return res.json({ message: 'User deleted', userId });
+    return res.json({ message: 'User deleted', userId, deleted_files: cleanup.deleted.length });
   } catch (error) {
     return res.status(500).json({ message: 'Delete user failed', error: error.message });
   }
@@ -159,9 +178,17 @@ exports.deleteImageAnyUser = async (req, res) => {
     pathsToDelete.add(image.current_path);
     versions.forEach((v) => pathsToDelete.add(v.file_path));
 
+    const cleanup = deleteFilesIfPresent(Array.from(pathsToDelete));
+    if (cleanup.failed.length) {
+      return res.status(500).json({
+        message: 'Image files could not be deleted from server',
+        imageId,
+        failed_files: cleanup.failed
+      });
+    }
+
     await db.query('DELETE FROM images WHERE id = ?', [imageId]);
-    deleteFilesIfPresent(Array.from(pathsToDelete));
-    return res.json({ message: 'Image deleted', imageId });
+    return res.json({ message: 'Image deleted', imageId, deleted_files: cleanup.deleted.length });
   } catch (error) {
     return res.status(500).json({ message: 'Delete image failed', error: error.message });
   }

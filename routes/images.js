@@ -8,6 +8,7 @@ router.post('/upload', verifyToken, imageController.uploadMiddleware, imageContr
 router.get('/', verifyToken, imageController.listMyImages);
 router.post('/:id/original', verifyToken, imageController.uploadMiddleware, imageController.replaceOriginalImage);
 router.post('/:id/process', verifyToken, imageController.processImage);
+router.post('/:id/preview/discard', verifyToken, imageController.discardPreviewImage);
 router.post('/:id/accept', verifyToken, imageController.acceptEnhancedImage);
 router.delete('/:id/versions', verifyToken, imageController.deleteEnhancedVersions);
 router.delete('/:id/enhanced', verifyToken, imageController.deleteAllEnhancedVersions);

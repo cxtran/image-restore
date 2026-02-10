@@ -689,6 +689,17 @@ function openEnhanceModal() {
 }
 
 function closeEnhanceModal() {
+  const previewToDiscard = state.pendingEnhancedPath;
+  const selectedImageId = Number(state.selectedImageId) || null;
+  if (previewToDiscard && selectedImageId) {
+    discardPendingPreview(selectedImageId, previewToDiscard).catch(() => {});
+  }
+  state.pendingEnhancedPath = '';
+  if (previewToDiscard && state.completedPreviewUrl === previewToDiscard) {
+    state.completedPreviewUrl = '';
+    state.afterBytes = null;
+    renderPreviews();
+  }
   enhanceModalEl.hidden = true;
   state.suppressExistingEnhancedPreview = false;
   resetProgress();
@@ -1435,6 +1446,19 @@ async function updateOriginalImage(imageId, file) {
   log(t('originalUpdated'));
 }
 
+async function discardPendingPreview(imageId, previewPath) {
+  if (!imageId || !previewPath) return;
+  try {
+    await api(`/api/images/${imageId}/preview/discard`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ preview_path: previewPath })
+    });
+  } catch (_err) {
+    // Keep UX non-blocking if cleanup fails.
+  }
+}
+
 async function loadImageAsFile(filePath, fallbackName = 'image.jpg') {
   const res = await fetch(String(filePath), { credentials: 'include' });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1463,6 +1487,16 @@ document.getElementById('process').onclick = async () => {
   try {
     const imageId = Number(state.selectedImageId);
     if (!imageId) throw new Error(t('selectImageFromList'));
+    const oldPendingPreview = state.pendingEnhancedPath;
+    if (oldPendingPreview) {
+      await discardPendingPreview(imageId, oldPendingPreview);
+      state.pendingEnhancedPath = '';
+      if (state.completedPreviewUrl === oldPendingPreview) {
+        state.completedPreviewUrl = '';
+        state.afterBytes = null;
+        renderPreviews();
+      }
+    }
     setProgress(3, t('startingJob'));
     const targetWidth = Number(targetWidthEl.value);
     const targetHeightRaw = String(targetHeightEl.value || '').trim().toLowerCase();
@@ -1504,7 +1538,7 @@ document.getElementById('process').onclick = async () => {
     state.suppressExistingEnhancedPreview = false;
     state.completedPreviewUrl = data.preview_path || data.path || '';
     state.pendingEnhancedPath = data.preview_path || data.path || '';
-    state.afterBytes = null;
+    state.afterBytes = Number.isFinite(Number(data.preview_size_bytes)) ? Number(data.preview_size_bytes) : null;
     renderPreviews();
     setProgress(100, t('completed'));
 
