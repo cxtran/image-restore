@@ -18,6 +18,18 @@ This app is structured similarly to `lotus-memories-db`:
   - Local fallback mode is also supported via `REALESRGAN_CMD` / `GFPGAN_CMD` / `DEOLDIFY_CMD` + Python OpenCV script
 - Live websocket progress updates during enhancement (Lotus-style progress bar)
 
+## Latest UI/UX updates
+- Image library now sorts by latest upload first (newest on top).
+- Version view modal:
+  - Hover the compare icon to preview original image.
+  - If original is smaller than enhanced, original is shown as a framed overlay on top of a dimmed enhanced image.
+- Enhancement modal:
+  - Click the enhanced preview to open full-size image modal.
+- Upload/crop modal:
+  - Rotation controls added (rotate left/right and orientation slider with 1-degree steps).
+- Upload file picker text is fully translatable in-app (custom picker, including Vietnamese labels like `Chọn ảnh` / `Chưa chọn ảnh`).
+- Image deletion completion no longer shows a popup notification.
+
 ## Local setup
 1. `cp .env.example .env`
 2. Create MySQL/MariaDB database and run `scripts/create_tables.sql`
