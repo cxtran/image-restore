@@ -94,7 +94,8 @@ const i18n = {
     resolutionDash: '-',
     imageCaption: '{name} | size {size} | uploaded {time}',
     versions: 'Versions:',
-    edit: 'Edit',
+    enhance: 'Enhance',
+    editOriginal: 'Edit Original',
     emailRequired: 'Email is required.',
     passwordMin: 'Password must be at least 8 characters.',
     passwordConfirmMismatch: 'Password confirmation does not match.',
@@ -117,6 +118,8 @@ const i18n = {
     resetDefaultsDone: 'All enhancement settings reset to default.',
     noPendingPreview: 'No pending enhanced preview to save.',
     enhancedSaved: 'Enhanced image saved.',
+    originalUpdated: 'Original image updated.',
+    loadingOriginal: 'Loading original image...',
     versionFileMissing: 'Version file is missing',
     originalVersionDeleteBlocked: 'Original version cannot be deleted here',
     deleteVersionConfirm: 'Delete version {version}?',
@@ -200,7 +203,8 @@ const i18n = {
     resolutionDash: '-',
     imageCaption: '{name} | dung lượng {size} | tải lên {time}',
     versions: 'Phiên bản:',
-    edit: 'Chỉnh sửa',
+    enhance: 'Nâng cấp',
+    editOriginal: 'Sửa ảnh gốc',
     emailRequired: 'Email là bắt buộc.',
     passwordMin: 'Mật khẩu phải có ít nhất 8 ký tự.',
     passwordConfirmMismatch: 'Xác nhận mật khẩu không khớp.',
@@ -223,6 +227,8 @@ const i18n = {
     resetDefaultsDone: 'Đã đặt lại toàn bộ thiết lập nâng cấp về mặc định.',
     noPendingPreview: 'Không có bản xem trước nâng cấp để lưu.',
     enhancedSaved: 'Đã lưu ảnh nâng cấp.',
+    originalUpdated: 'Đã cập nhật ảnh gốc.',
+    loadingOriginal: 'Đang tải ảnh gốc...',
     versionFileMissing: 'Không tìm thấy tệp phiên bản',
     originalVersionDeleteBlocked: 'Không thể xóa phiên bản gốc ở đây',
     deleteVersionConfirm: 'Xóa phiên bản {version}?',
@@ -331,6 +337,9 @@ const socket = window.io ? window.io({ withCredentials: true }) : null;
 let socketId = null;
 let cropper = null;
 let pendingUploadFile = null;
+let cropSourceFile = null;
+let cropMode = 'upload';
+let cropTargetImageId = null;
 let pendingResizeDefaultsFromOriginal = false;
 let isRefreshingImages = false;
 let progressHideTimer = null;
@@ -357,6 +366,8 @@ versionViewModalEl.className = 'version-view-modal';
 versionViewModalEl.hidden = true;
 versionViewModalEl.innerHTML = `
   <div class="version-view-dialog">
+    <button type="button" class="version-view-nav prev" aria-label="Previous enhanced image" title="Previous enhanced image">‹</button>
+    <button type="button" class="version-view-nav next" aria-label="Next enhanced image" title="Next enhanced image">›</button>
     <button type="button" class="version-view-close" aria-label="Close">&times;</button>
     <button type="button" class="version-view-compare" aria-label="Show original" title="Show original">
       <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -370,6 +381,8 @@ versionViewModalEl.innerHTML = `
 document.body.appendChild(versionViewModalEl);
 const versionViewImageEl = versionViewModalEl.querySelector('.version-view-image-base');
 const versionViewOverlayImageEl = versionViewModalEl.querySelector('.version-view-image-overlay');
+const versionViewPrevEl = versionViewModalEl.querySelector('.version-view-nav.prev');
+const versionViewNextEl = versionViewModalEl.querySelector('.version-view-nav.next');
 const versionViewCloseEl = versionViewModalEl.querySelector('.version-view-close');
 const versionViewCompareEl = versionViewModalEl.querySelector('.version-view-compare');
 const versionMenuDeleteBtnEl = versionContextMenuEl.querySelector('button[data-action="delete"]');
@@ -377,6 +390,8 @@ const versionMenuMetaEl = versionContextMenuEl.querySelector('[data-meta]');
 const versionViewState = {
   enhancedPath: '',
   originalPath: '',
+  imageId: null,
+  enhancedVersionIndex: -1,
   showingOriginal: false,
   enhancedDims: null,
   originalDims: null
@@ -407,6 +422,12 @@ function setCheckboxLabel(inputId, labelText) {
   if (!wrap) return;
   const textNode = Array.from(wrap.childNodes).find((node) => node.nodeType === Node.TEXT_NODE);
   if (textNode) textNode.nodeValue = ` ${labelText}`;
+}
+
+function updateCropModalTitle() {
+  const cropTitleEl = document.getElementById('cropTitle');
+  if (!cropTitleEl) return;
+  cropTitleEl.textContent = cropMode === 'edit-original' ? t('editOriginal') : t('uploadImage');
 }
 
 function applyLanguage() {
@@ -457,7 +478,7 @@ function applyLanguage() {
   setText('useEnhancedBtn', 'saveEnhancedVersion');
   setText('resetAdjustmentsBtn', 'resetAllSettings');
   setText('process', 'generatePreview');
-  setText('cropTitle', 'uploadImage');
+  updateCropModalTitle();
   setText('cropPreviewTitle', 'cropPreview');
   setText('cropRotateLabel', 'rotate');
   setText('cropRotateLeft', 'rotateLeft');
@@ -813,6 +834,12 @@ function getSelectedVersions(imageId) {
   return state.selectedVersions[key];
 }
 
+function getEnhancedVersions(image) {
+  return (image?.versions || [])
+    .filter((v) => Number(v.version_num) > 1 && v.file_path)
+    .sort((a, b) => Number(a.version_num) - Number(b.version_num));
+}
+
 function toggleVersionSelection(imageId, versionNum) {
   const selected = getSelectedVersions(imageId);
   if (selected.has(versionNum)) {
@@ -929,14 +956,42 @@ function setVersionViewSource(showOriginal) {
   }
 }
 
-function openVersionViewModal(filePath, originalPath = '') {
+function updateVersionViewNavButtons() {
+  const image = getImageRowById(versionViewState.imageId);
+  const enhancedVersions = getEnhancedVersions(image);
+  const hasNav = enhancedVersions.length > 1 && versionViewState.enhancedVersionIndex >= 0;
+  if (versionViewPrevEl) versionViewPrevEl.hidden = !hasNav;
+  if (versionViewNextEl) versionViewNextEl.hidden = !hasNav;
+}
+
+function browseVersionInModal(direction) {
+  const image = getImageRowById(versionViewState.imageId);
+  const enhancedVersions = getEnhancedVersions(image);
+  if (enhancedVersions.length <= 1) return;
+  let idx = Number(versionViewState.enhancedVersionIndex);
+  if (!Number.isInteger(idx) || idx < 0 || idx >= enhancedVersions.length) idx = 0;
+  idx = (idx + (direction >= 0 ? 1 : -1) + enhancedVersions.length) % enhancedVersions.length;
+  const target = enhancedVersions[idx];
+  const originalPath = getOriginalPathForImage(versionViewState.imageId);
+  openVersionViewModal(target.file_path, originalPath, versionViewState.imageId);
+}
+
+function openVersionViewModal(filePath, originalPath = '', imageId = null) {
   if (!filePath) return;
   versionViewState.enhancedPath = filePath;
   versionViewState.originalPath = originalPath;
+  versionViewState.imageId = Number.isFinite(Number(imageId)) ? Number(imageId) : null;
+  versionViewState.enhancedVersionIndex = -1;
   versionViewState.showingOriginal = false;
   versionViewState.enhancedDims = null;
   versionViewState.originalDims = null;
   versionViewImageEl.src = filePath;
+  if (versionViewState.imageId) {
+    const image = getImageRowById(versionViewState.imageId);
+    const enhancedVersions = getEnhancedVersions(image);
+    versionViewState.enhancedVersionIndex = enhancedVersions.findIndex((v) => v.file_path === filePath);
+  }
+  updateVersionViewNavButtons();
   if (versionViewCompareEl) {
     const canCompare = Boolean(originalPath && originalPath !== filePath);
     versionViewCompareEl.hidden = !canCompare;
@@ -959,12 +1014,15 @@ function openVersionViewModal(filePath, originalPath = '') {
 function closeVersionViewModal() {
   versionViewState.enhancedPath = '';
   versionViewState.originalPath = '';
+  versionViewState.imageId = null;
+  versionViewState.enhancedVersionIndex = -1;
   versionViewState.showingOriginal = false;
   versionViewState.enhancedDims = null;
   versionViewState.originalDims = null;
   versionViewModalEl.classList.remove('version-view-overlay-active');
   versionViewModalEl.hidden = true;
   versionViewImageEl.src = '';
+  updateVersionViewNavButtons();
   if (versionViewCompareEl) {
     versionViewCompareEl.hidden = true;
   }
@@ -1030,9 +1088,13 @@ function showVersionMenu(imageId, versionNum, filePath, sizeBytes, event) {
   });
 }
 
-function openCropModal(imageUrl) {
+function openCropModal(imageUrl, options = {}) {
+  cropMode = options.mode === 'edit-original' ? 'edit-original' : 'upload';
+  cropTargetImageId = Number(options.imageId) || null;
+  cropSourceFile = options.sourceFile || photoInputEl.files[0] || null;
+  updateCropModalTitle();
   if (!window.Cropper) {
-    pendingUploadFile = photoInputEl.files[0] || null;
+    pendingUploadFile = cropSourceFile;
     if (pendingUploadFile) {
       state.uploadedPreviewUrl = URL.createObjectURL(pendingUploadFile);
       state.beforeBytes = pendingUploadFile.size;
@@ -1065,6 +1127,9 @@ function closeCropModal() {
     cropper.destroy();
     cropper = null;
   }
+  cropMode = 'upload';
+  cropTargetImageId = null;
+  cropSourceFile = null;
 }
 
 function setCropRotation(nextDeg) {
@@ -1187,7 +1252,7 @@ function renderImageList() {
         e.preventDefault();
         e.stopPropagation();
         const originalPath = Number(v.version_num) > 1 ? getOriginalPathForImage(row.id) : '';
-        openVersionViewModal(v.file_path, originalPath);
+        openVersionViewModal(v.file_path, originalPath, row.id);
       };
       chip.oncontextmenu = (e) => {
         e.preventDefault();
@@ -1211,20 +1276,41 @@ function renderImageList() {
     const actions = document.createElement('div');
     actions.className = 'row-actions';
 
-    const restoreBtn = document.createElement('button');
-    restoreBtn.className = 'ghost';
-    restoreBtn.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6V3L8 7l4 4V8c2.8 0 5 2.2 5 5a5 5 0 0 1-5 5 5 5 0 0 1-4.9-4H5.1A7 7 0 0 0 12 20a7 7 0 0 0 0-14z"/></svg><span>${t('edit')}</span>`;
-    restoreBtn.onclick = () => {
+    const enhanceBtn = document.createElement('button');
+    enhanceBtn.className = 'ghost';
+    enhanceBtn.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6V3L8 7l4 4V8c2.8 0 5 2.2 5 5a5 5 0 0 1-5 5 5 5 0 0 1-4.9-4H5.1A7 7 0 0 0 12 20a7 7 0 0 0 0-14z"/></svg><span>${t('enhance')}</span>`;
+    enhanceBtn.onclick = () => {
       state.suppressExistingEnhancedPreview = true;
       setSelectedImage(row, { showCurrentAsEnhanced: false });
       openEnhanceModal();
+    };
+
+    const editOriginalBtn = document.createElement('button');
+    editOriginalBtn.className = 'ghost';
+    editOriginalBtn.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.25V21h3.75L19.81 7.94l-3.75-3.75L3 17.25zm2.92 2.33H5v-.92l10.06-10.06.92.92L5.92 19.58zM20.71 6.04a1 1 0 0 0 0-1.41L19.37 3.3a1 1 0 0 0-1.41 0l-1.14 1.14 3.75 3.75 1.14-1.15z"/></svg><span>${t('editOriginal')}</span>`;
+    editOriginalBtn.onclick = async () => {
+      try {
+        log(t('loadingOriginal'));
+        const sourcePath = row.original_path || row.current_path || '';
+        if (!sourcePath) throw new Error(t('versionFileMissing'));
+        const sourceFile = await loadImageAsFile(sourcePath, row.original_name || 'original.jpg');
+        const objectUrl = URL.createObjectURL(sourceFile);
+        openCropModal(objectUrl, {
+          mode: 'edit-original',
+          imageId: row.id,
+          sourceFile
+        });
+      } catch (err) {
+        log(err.message || t('versionActionFailed'));
+      }
     };
 
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'danger ghost';
     deleteBtn.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5h8l1 2h4v2H3V7h4l1-2zm1 6h2v8H9v-8zm4 0h2v8h-2v-8z"/></svg><span>${t('delete')}</span>`;
     deleteBtn.onclick = () => deleteImage(row.id).catch((e) => log(e.message));
-    actions.appendChild(restoreBtn);
+    actions.appendChild(enhanceBtn);
+    actions.appendChild(editOriginalBtn);
     actions.appendChild(deleteBtn);
     li.appendChild(metaWrap);
     li.appendChild(actions);
@@ -1332,6 +1418,45 @@ async function uploadPendingOrSelectedFile() {
 
   log(t('uploaded', { name: file.name || t('imageWord') }));
   await refreshImages();
+}
+
+async function updateOriginalImage(imageId, file) {
+  if (!imageId || !file) throw new Error(t('selectImageFirst'));
+  const form = new FormData();
+  form.append('photo', file);
+  await api(`/api/images/${imageId}/original`, { method: 'POST', body: form });
+  state.selectedImageId = imageId;
+  state.pendingEnhancedPath = '';
+  state.completedPreviewUrl = '';
+  state.afterBytes = null;
+  await refreshImages();
+  const selected = getImageRowById(imageId);
+  if (selected) setSelectedImage(selected);
+  log(t('originalUpdated'));
+}
+
+async function loadImageAsFile(filePath, fallbackName = 'image.jpg') {
+  const res = await fetch(String(filePath), { credentials: 'include' });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const blob = await res.blob();
+  const ext = pathExtFromMime(blob.type) || pathExtFromName(fallbackName) || 'jpg';
+  const safeName = String(fallbackName || `image.${ext}`).replace(/[\\/:*?"<>|]+/g, '_');
+  return new File([blob], safeName, { type: blob.type || `image/${ext}` });
+}
+
+function pathExtFromName(name) {
+  const m = String(name || '').toLowerCase().match(/\.([a-z0-9]+)$/);
+  return m ? m[1] : '';
+}
+
+function pathExtFromMime(mime) {
+  const map = {
+    'image/jpeg': 'jpg',
+    'image/jpg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp'
+  };
+  return map[String(mime || '').toLowerCase()] || '';
 }
 
 document.getElementById('process').onclick = async () => {
@@ -1462,13 +1587,16 @@ photoInputEl.addEventListener('change', () => {
   updateFilePickerLabel(file || null);
   if (!file) return;
   const objectUrl = URL.createObjectURL(file);
-  openCropModal(objectUrl);
+  openCropModal(objectUrl, { mode: 'upload', sourceFile: file });
 });
 
 cropCancelEl.addEventListener('click', () => {
+  const wasUpload = cropMode === 'upload';
   closeCropModal();
-  photoInputEl.value = '';
-  updateFilePickerLabel(null);
+  if (wasUpload) {
+    photoInputEl.value = '';
+    updateFilePickerLabel(null);
+  }
   pendingUploadFile = null;
 });
 
@@ -1478,7 +1606,9 @@ cropApplyEl.addEventListener('click', () => {
   if (!canvas) return;
   canvas.toBlob((blob) => {
     if (!blob) return;
-    const originalName = (photoInputEl.files[0] && photoInputEl.files[0].name) || 'cropped.jpg';
+    const mode = cropMode;
+    const targetImageId = cropTargetImageId;
+    const originalName = (cropSourceFile && cropSourceFile.name) || (photoInputEl.files[0] && photoInputEl.files[0].name) || 'cropped.jpg';
     pendingUploadFile = new File([blob], originalName, { type: blob.type || 'image/jpeg' });
     state.uploadedPreviewUrl = URL.createObjectURL(pendingUploadFile);
     state.beforeBytes = pendingUploadFile.size;
@@ -1487,13 +1617,19 @@ cropApplyEl.addEventListener('click', () => {
     pendingResizeDefaultsFromOriginal = true;
     renderPreviews();
     closeCropModal();
-    uploadPendingOrSelectedFile().catch((e) => log(e.message));
+    if (mode === 'edit-original' && targetImageId) {
+      updateOriginalImage(targetImageId, pendingUploadFile).catch((e) => log(e.message));
+    } else {
+      uploadPendingOrSelectedFile().catch((e) => log(e.message));
+    }
   }, 'image/jpeg', 0.95);
 });
 
 cropUseOriginalEl.addEventListener('click', () => {
-  const original = photoInputEl.files[0];
+  const original = cropSourceFile || photoInputEl.files[0];
   if (!original) return;
+  const mode = cropMode;
+  const targetImageId = cropTargetImageId;
   pendingUploadFile = original;
   state.uploadedPreviewUrl = URL.createObjectURL(original);
   state.beforeBytes = original.size;
@@ -1502,7 +1638,11 @@ cropUseOriginalEl.addEventListener('click', () => {
   pendingResizeDefaultsFromOriginal = true;
   renderPreviews();
   closeCropModal();
-  uploadPendingOrSelectedFile().catch((e) => log(e.message));
+  if (mode === 'edit-original' && targetImageId) {
+    updateOriginalImage(targetImageId, pendingUploadFile).catch((e) => log(e.message));
+  } else {
+    uploadPendingOrSelectedFile().catch((e) => log(e.message));
+  }
 });
 
 if (cropRotateLeftEl) {
@@ -1548,7 +1688,7 @@ versionContextMenuEl.addEventListener('click', async (e) => {
     if (action === 'view') {
       if (!filePath) throw new Error(t('versionFileMissing'));
       const originalPath = versionNum > 1 ? getOriginalPathForImage(imageId) : '';
-      openVersionViewModal(filePath, originalPath);
+      openVersionViewModal(filePath, originalPath, imageId);
       return;
     }
     if (action === 'download') {
@@ -1575,6 +1715,16 @@ versionContextMenuEl.addEventListener('click', async (e) => {
 });
 
 versionViewCloseEl.addEventListener('click', closeVersionViewModal);
+versionViewPrevEl.addEventListener('click', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  browseVersionInModal(-1);
+});
+versionViewNextEl.addEventListener('click', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  browseVersionInModal(1);
+});
 versionViewCompareEl.addEventListener('mouseenter', () => {
   if (versionViewModalEl.hidden) return;
   if (!versionViewState.originalPath) return;
@@ -1630,7 +1780,9 @@ completedPreviewEl.addEventListener('load', () => {
 });
 completedPreviewEl.addEventListener('click', () => {
   if (!state.completedPreviewUrl) return;
-  openVersionViewModal(state.completedPreviewUrl);
+  const imageId = Number(state.selectedImageId) || null;
+  const originalPath = imageId ? getOriginalPathForImage(imageId) : '';
+  openVersionViewModal(state.completedPreviewUrl, originalPath, imageId);
 });
 
 if (languageToggleEl) {
@@ -1736,3 +1888,4 @@ if (forcePasswordLogoutEl) {
     document.getElementById('logout').click();
   });
 }
+

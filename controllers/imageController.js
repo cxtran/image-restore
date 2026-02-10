@@ -67,6 +67,46 @@ exports.uploadPhoto = async (req, res) => {
   }
 };
 
+exports.replaceOriginalImage = async (req, res) => {
+  const imageId = Number(req.params.id);
+  if (!req.file) return res.status(400).json({ message: 'Photo is required' });
+
+  try {
+    const [rows] = await db.query('SELECT * FROM images WHERE id = ? AND user_id = ?', [imageId, req.user.id]);
+    const image = rows[0];
+    if (!image) return res.status(404).json({ message: 'Image not found' });
+
+    const newOriginalPath = `/uploads/${req.file.filename}`;
+    const oldOriginalPath = image.original_path;
+    const shouldUpdateCurrentPath = String(image.current_path || '') === String(oldOriginalPath || '');
+
+    await db.query('UPDATE images SET original_path = ?, current_path = IF(? = 1, ?, current_path) WHERE id = ?', [
+      newOriginalPath,
+      shouldUpdateCurrentPath ? 1 : 0,
+      newOriginalPath,
+      imageId
+    ]);
+
+    await db.query(
+      'UPDATE image_versions SET file_path = ?, operations_json = ? WHERE image_id = ? AND version_num = 1',
+      [newOriginalPath, JSON.stringify({ original_replaced: true }), imageId]
+    );
+
+    const [usage] = await db.query(
+      'SELECT COUNT(*) AS c FROM image_versions WHERE file_path = ?',
+      [oldOriginalPath]
+    );
+    const stillReferencedByCurrent = String(image.current_path || '') === String(oldOriginalPath || '') && !shouldUpdateCurrentPath;
+    if (oldOriginalPath && Number(usage[0]?.c || 0) === 0 && !stillReferencedByCurrent) {
+      deleteFilesIfPresent([oldOriginalPath]);
+    }
+
+    return res.json({ message: 'Original image updated', imageId, original_path: newOriginalPath });
+  } catch (error) {
+    return res.status(500).json({ message: 'Update original failed', error: error.message });
+  }
+};
+
 exports.listMyImages = async (req, res) => {
   try {
     const [rows] = await db.query(

@@ -670,6 +670,35 @@ button.ghost.danger:hover {
   filter: brightness(0.45);
 }
 
+.version-view-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 4;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid rgba(128, 136, 146, 0.6);
+  background: rgba(255, 255, 255, 0.22);
+  color: #6f7983;
+  font-size: 22px;
+  line-height: 1;
+  padding: 0;
+}
+
+.version-view-nav.prev {
+  left: 10px;
+}
+
+.version-view-nav.next {
+  right: 10px;
+}
+
+.version-view-nav:hover {
+  background: rgba(255, 255, 255, 0.34);
+  color: #5f6973;
+}
+
 .version-view-compare {
   position: absolute;
   left: 12px;

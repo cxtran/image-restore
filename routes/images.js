@@ -6,6 +6,7 @@ const router = express.Router();
 
 router.post('/upload', verifyToken, imageController.uploadMiddleware, imageController.uploadPhoto);
 router.get('/', verifyToken, imageController.listMyImages);
+router.post('/:id/original', verifyToken, imageController.uploadMiddleware, imageController.replaceOriginalImage);
 router.post('/:id/process', verifyToken, imageController.processImage);
 router.post('/:id/accept', verifyToken, imageController.acceptEnhancedImage);
 router.delete('/:id/versions', verifyToken, imageController.deleteEnhancedVersions);
