@@ -997,6 +997,12 @@ function getEnhancedVersions(image) {
     .sort((a, b) => Number(a.version_num) - Number(b.version_num));
 }
 
+function getLatestDisplayPathForYourImageTile(row) {
+  const enhanced = getEnhancedVersions(row);
+  const latestEnhanced = enhanced.length ? enhanced[enhanced.length - 1] : null;
+  return latestEnhanced?.file_path || row.current_path || row.original_path || row.icon_path || '';
+}
+
 function toggleVersionSelection(imageId, versionNum) {
   const selected = getSelectedVersions(imageId);
   if (selected.has(versionNum)) {
@@ -1382,12 +1388,10 @@ function renderImageList() {
 
       const img = document.createElement('img');
       img.alt = row.original_name || `image-${row.id}`;
-      img.src = state.yourLayout === 'masonry'
-        ? (row.current_path || row.original_path || row.icon_path || '')
-        : (row.icon_path || row.original_path || row.current_path || '');
+      img.src = getLatestDisplayPathForYourImageTile(row);
       img.loading = 'lazy';
       img.onerror = () => {
-        img.src = row.original_path || row.current_path || '';
+        img.src = row.original_path || row.icon_path || row.current_path || '';
       };
 
       tileBtn.addEventListener('click', (e) => {
