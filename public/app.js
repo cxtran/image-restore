@@ -25,6 +25,8 @@ const state = {
 
 const LANG_KEY = 'ui_language';
 const METADATA_VIS_KEY = 'show_image_metadata';
+const SHARED_LAYOUT_KEY = 'shared_images_layout';
+const SHARED_CAPTION_VIS_KEY = 'show_shared_captions';
 const supportedLanguages = new Set(['en', 'vi']);
 let currentLang = (() => {
   const saved = String(window.localStorage.getItem(LANG_KEY) || 'en').toLowerCase();
@@ -35,6 +37,15 @@ state.showImageMetadata = (() => {
   if (saved === 'true') return true;
   if (saved === 'false') return false;
   return false;
+})();
+state.sharedLayout = (() => {
+  const saved = String(window.localStorage.getItem(SHARED_LAYOUT_KEY) || '').toLowerCase();
+  return saved === 'masonry' ? 'masonry' : 'tile';
+})();
+state.showSharedCaptions = (() => {
+  const saved = String(window.localStorage.getItem(SHARED_CAPTION_VIS_KEY) || '').toLowerCase();
+  if (saved === 'false') return false;
+  return true;
 })();
 
 const i18n = {
@@ -55,6 +66,10 @@ const i18n = {
     captionPlaceholder: 'Image caption (optional)',
     showMetadata: 'Show Image Info',
     hideMetadata: 'Hide Image Info',
+    showCaption: 'Show Caption',
+    hideCaption: 'Hide Caption',
+    layoutTile: 'Layout: Tile',
+    layoutMasonry: 'Layout: Masonry',
     totalImages: 'Total Images: {count}',
     yourImages: 'Your Images',
     sharedImages: 'Shared Images',
@@ -176,6 +191,10 @@ const i18n = {
     caption: 'Chú thích',
     showMetadata: 'Hiển thị thông tin ảnh',
     hideMetadata: 'Giấu thông tin ảnh',
+    showCaption: 'Hiển thị chú thích',
+    hideCaption: 'Giấu chú thích',
+    layoutTile: 'Bố cục: Ô',
+    layoutMasonry: 'Bố cục: Masonry',
     totalImages: 'Tổng số ảnh: {count}',
     sharedImages: 'Ảnh chia sẻ',
     yourImages: 'Ảnh của bạn',
@@ -365,6 +384,7 @@ const filePickerBtnEl = document.getElementById('filePickerBtn');
 const filePickerNameEl = document.getElementById('filePickerName');
 const toggleMetadataEl = document.getElementById('toggleMetadata');
 const toggleMetadataSharedEl = document.getElementById('toggleMetadataShared');
+const toggleSharedLayoutEl = document.getElementById('toggleSharedLayout');
 const yourImagesCountEl = document.getElementById('yourImagesCount');
 const sharedImagesCountEl = document.getElementById('sharedImagesCount');
 const loginPasswordInputEl = document.getElementById('password');
@@ -471,12 +491,10 @@ function updateCropModalTitle() {
 
 function syncMetadataToggleButtons() {
   const label = state.showImageMetadata ? t('hideMetadata') : t('showMetadata');
-  [toggleMetadataEl, toggleMetadataSharedEl].forEach((btn) => {
-    if (!btn) return;
-    btn.textContent = label;
-    btn.setAttribute('aria-label', label);
-    btn.title = label;
-  });
+  if (!toggleMetadataEl) return;
+  toggleMetadataEl.textContent = label;
+  toggleMetadataEl.setAttribute('aria-label', label);
+  toggleMetadataEl.title = label;
 }
 
 function syncLoginPasswordToggle() {
@@ -493,8 +511,32 @@ function syncImageCounts() {
     yourImagesCountEl.textContent = t('totalImages', { count: state.images.length });
   }
   if (sharedImagesCountEl) {
-    sharedImagesCountEl.textContent = t('totalImages', { count: state.sharedImages.length });
+    const sharedCount = state.sharedImages.reduce((acc, row) => (
+      acc + ((row?.versions || []).filter((v) => v && v.file_path).length || 0)
+    ), 0);
+    sharedImagesCountEl.textContent = t('totalImages', { count: sharedCount });
   }
+}
+
+function syncSharedLayoutUI() {
+  const sharedListEl = document.getElementById('sharedImages');
+  if (sharedListEl) {
+    sharedListEl.classList.toggle('shared-layout-masonry', state.sharedLayout === 'masonry');
+  }
+  if (toggleSharedLayoutEl) {
+    const label = state.sharedLayout === 'masonry' ? t('layoutMasonry') : t('layoutTile');
+    toggleSharedLayoutEl.textContent = label;
+    toggleSharedLayoutEl.title = label;
+    toggleSharedLayoutEl.setAttribute('aria-label', label);
+  }
+}
+
+function syncSharedCaptionToggleUI() {
+  if (!toggleMetadataSharedEl) return;
+  const label = state.showSharedCaptions ? t('hideCaption') : t('showCaption');
+  toggleMetadataSharedEl.textContent = label;
+  toggleMetadataSharedEl.setAttribute('aria-label', label);
+  toggleMetadataSharedEl.title = label;
 }
 
 function applyLanguage() {
@@ -611,6 +653,8 @@ function applyLanguage() {
   updateSliderLabels();
   updatePreviewSizeLabels();
   syncMetadataToggleButtons();
+  syncSharedLayoutUI();
+  syncSharedCaptionToggleUI();
   syncImageCounts();
   renderImageList();
   renderSharedImageList();
@@ -1445,86 +1489,47 @@ function renderSharedImageList() {
   syncImageCounts();
 
   state.sharedImages.forEach((row) => {
-    const li = document.createElement('li');
-
-    const metaWrap = document.createElement('div');
-    metaWrap.className = 'image-meta';
-    const topRow = document.createElement('div');
-    topRow.className = 'image-top-row';
-
-    const icon = document.createElement('button');
-    icon.type = 'button';
-    icon.className = 'image-icon';
-    icon.setAttribute('aria-label', `${t('view')}: ${row.original_name || `image-${row.id}`}`);
-    const iconImg = document.createElement('img');
-    iconImg.alt = row.original_name || `image-${row.id}`;
-    iconImg.src = row.icon_path || row.original_path || row.current_path || '';
-    iconImg.loading = 'lazy';
-    iconImg.onerror = () => {
-      icon.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM7 9a2 2 0 1 0 0.001 0zM6 17h12l-4-5-3 4-2-2z"/></svg>';
-    };
-    icon.onclick = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const originalPath = getOriginalPathForImage(row.id);
-      if (!originalPath) return;
-      openVersionViewModal(originalPath, originalPath, row.id);
-    };
-    icon.appendChild(iconImg);
-    topRow.appendChild(icon);
-
-    const versions = document.createElement('div');
-    versions.className = 'version-row';
-    const versionTitle = document.createElement('span');
-    versionTitle.className = 'version-title';
-    versionTitle.textContent = t('versions');
-    versions.appendChild(versionTitle);
     (row.versions || []).forEach((v) => {
-      const chip = document.createElement('button');
-      chip.type = 'button';
-      chip.className = 'version-chip';
-      chip.textContent = String(v.version_num);
-      if (v.is_shared !== false) {
-        chip.classList.add('shared');
-        chip.title = t('shared');
-        chip.setAttribute('aria-label', `${t('shared')} ${v.version_num}`);
+      if (!v || !v.file_path) return;
+
+      const li = document.createElement('li');
+      const tileBtn = document.createElement('button');
+      tileBtn.type = 'button';
+      tileBtn.className = 'shared-image-tile-btn';
+      tileBtn.setAttribute('aria-label', `${t('view')}: ${row.original_name || `image-${row.id}`}`);
+      const hoverTitle = row.caption
+        ? String(row.caption)
+        : (row.owner_email ? t('sharedBy', { email: row.owner_email }) : t('view'));
+      tileBtn.title = hoverTitle;
+
+      const img = document.createElement('img');
+      img.alt = row.original_name || `image-${row.id}`;
+      img.src = v.file_path;
+      img.loading = 'lazy';
+      if (row.caption) {
+        img.title = String(row.caption);
       }
-      chip.onclick = (e) => {
+      img.onerror = () => {
+        img.src = row.icon_path || row.original_path || row.current_path || '';
+      };
+
+      tileBtn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
         const originalPath = Number(v.version_num) > 1 ? getOriginalPathForImage(row.id) : '';
         openVersionViewModal(v.file_path, originalPath, row.id);
-      };
-      versions.appendChild(chip);
-    });
-    if (!row.versions || row.versions.length === 0) {
-      const noVersion = document.createElement('span');
-      noVersion.className = 'version-empty';
-      noVersion.textContent = '1';
-      versions.appendChild(noVersion);
-    }
-    topRow.appendChild(versions);
+      });
 
-    const meta = document.createElement('span');
-    meta.className = 'image-caption';
-    const owner = row.owner_email ? ` | ${t('sharedBy', { email: row.owner_email })}` : '';
-    meta.textContent = `${t('imageCaption', {
-      name: row.original_name,
-      size: formatBytes(row.current_size_bytes),
-      time: formatUploadedAt(row.created_at)
-    })}${owner}`;
-    metaWrap.appendChild(topRow);
-    if (state.showImageMetadata) {
-      metaWrap.appendChild(meta);
-    }
-    if (row.caption) {
-      const captionTextEl = document.createElement('span');
-      captionTextEl.className = 'image-caption-text';
-      captionTextEl.textContent = row.caption;
-      metaWrap.appendChild(captionTextEl);
-    }
-    li.appendChild(metaWrap);
-    list.appendChild(li);
+      tileBtn.appendChild(img);
+      if (state.showSharedCaptions && row.caption) {
+        const captionOverlayEl = document.createElement('span');
+        captionOverlayEl.className = 'shared-image-caption-overlay';
+        captionOverlayEl.textContent = String(row.caption);
+        tileBtn.appendChild(captionOverlayEl);
+      }
+      li.appendChild(tileBtn);
+      list.appendChild(li);
+    });
   });
 }
 
@@ -1816,11 +1821,18 @@ if (toggleMetadataEl) {
 
 if (toggleMetadataSharedEl) {
   toggleMetadataSharedEl.addEventListener('click', () => {
-    state.showImageMetadata = !state.showImageMetadata;
-    window.localStorage.setItem(METADATA_VIS_KEY, String(state.showImageMetadata));
-    syncMetadataToggleButtons();
-    renderImageList();
+    state.showSharedCaptions = !state.showSharedCaptions;
+    window.localStorage.setItem(SHARED_CAPTION_VIS_KEY, String(state.showSharedCaptions));
+    syncSharedCaptionToggleUI();
     renderSharedImageList();
+  });
+}
+
+if (toggleSharedLayoutEl) {
+  toggleSharedLayoutEl.addEventListener('click', () => {
+    state.sharedLayout = state.sharedLayout === 'tile' ? 'masonry' : 'tile';
+    window.localStorage.setItem(SHARED_LAYOUT_KEY, state.sharedLayout);
+    syncSharedLayoutUI();
   });
 }
 
@@ -2090,6 +2102,8 @@ if (languageToggleEl) {
 
 applyLanguage();
 syncLoginPasswordToggle();
+syncSharedLayoutUI();
+syncSharedCaptionToggleUI();
 refreshImages().catch(() => {});
 renderPreviews();
 syncUseEnhancedButton();

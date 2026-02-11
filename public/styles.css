@@ -461,6 +461,81 @@ button.ghost.danger:hover {
 
 .image-list li:first-child { border-top: 0; }
 .image-list li button { padding: 6px 10px; font-size: 12px; }
+
+.shared-image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 12px;
+}
+
+.shared-image-grid li {
+  border: 1px solid #d3dee5;
+  border-radius: 10px;
+  overflow: hidden;
+  padding: 0;
+  background: #f8fcff;
+  box-shadow: 0 6px 18px rgba(18, 43, 59, 0.1);
+}
+
+.shared-image-grid li:first-child {
+  border-top: 1px solid #d3dee5;
+}
+
+.shared-image-tile-btn {
+  display: block;
+  width: 100%;
+  padding: 0 !important;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  position: relative;
+  overflow: hidden;
+}
+
+.shared-image-tile-btn img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+}
+
+.shared-image-grid.shared-layout-masonry {
+  display: block;
+  column-width: 180px;
+  column-gap: 12px;
+}
+
+.shared-image-grid.shared-layout-masonry li {
+  display: inline-block;
+  width: 100%;
+  margin: 0 0 12px;
+  break-inside: avoid;
+}
+
+.shared-image-grid.shared-layout-masonry .shared-image-tile-btn img {
+  aspect-ratio: auto;
+  height: auto;
+  object-fit: cover;
+}
+
+.shared-image-caption-overlay {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+  max-width: calc(100% - 16px);
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(8, 20, 30, 0.62);
+  color: #f3f8fb;
+  font-size: 11px;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
 .image-meta {
   display: flex;
   align-items: flex-start;
