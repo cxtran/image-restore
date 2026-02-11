@@ -14,6 +14,8 @@ const state = {
   selectedImageId: null,
   selectedVersions: {},
   images: [],
+  sharedImages: [],
+  showImageMetadata: false,
   beforeBytes: null,
   afterBytes: null,
   beforeDims: null,
@@ -22,10 +24,17 @@ const state = {
 };
 
 const LANG_KEY = 'ui_language';
+const METADATA_VIS_KEY = 'show_image_metadata';
 const supportedLanguages = new Set(['en', 'vi']);
 let currentLang = (() => {
   const saved = String(window.localStorage.getItem(LANG_KEY) || 'en').toLowerCase();
   return supportedLanguages.has(saved) ? saved : 'en';
+})();
+state.showImageMetadata = (() => {
+  const saved = String(window.localStorage.getItem(METADATA_VIS_KEY) || '').toLowerCase();
+  if (saved === 'true') return true;
+  if (saved === 'false') return false;
+  return false;
 })();
 
 const i18n = {
@@ -36,11 +45,18 @@ const i18n = {
     register: 'Register',
     email: 'Email',
     password: 'Password',
+    showPassword: 'Show Password',
+    hidePassword: 'Hide Password',
     login: 'Login',
     admin: 'Admin',
     logout: 'Logout',
     uploadImage: 'Upload Image',
+    caption: 'Caption',
+    captionPlaceholder: 'Image caption (optional)',
+    showMetadata: 'Show Metadata',
+    hideMetadata: 'Hide Metadata',
     yourImages: 'Your Images',
+    sharedImages: 'Shared Images',
     refreshLibrary: 'Refresh Library',
     notification: 'Notification',
     close: 'Close',
@@ -88,6 +104,10 @@ const i18n = {
     areYouSure: 'Are you sure?',
     imageNumber: 'image #{n}',
     view: 'View',
+    share: 'Share',
+    unshare: 'Unshare',
+    shared: 'Shared',
+    sharedBy: 'Shared by {email}',
     download: 'Download',
     delete: 'Delete',
     resolutionLoading: 'loading...',
@@ -124,6 +144,9 @@ const i18n = {
     originalVersionDeleteBlocked: 'Original version cannot be deleted here',
     deleteVersionConfirm: 'Delete version {version}?',
     deletedVersion: 'Deleted version {version}',
+    sharedImageEnabled: 'Version {version} is now shared with all users.',
+    sharedImageDisabled: 'Version {version} sharing turned off.',
+    shareActionFailed: 'Share action failed',
     versionActionFailed: 'Version action failed',
     deleteImageConfirm: 'Delete "{name}"? This cannot be undone.',
     deletedImage: 'Deleted "{name}"',
@@ -149,6 +172,10 @@ const i18n = {
     admin: 'Quản trị',
     logout: 'Đăng xuất',
     uploadImage: 'Tải ảnh lên',
+    caption: 'Chú thích',
+    showMetadata: 'Hiển thị thông tin',
+    hideMetadata: 'Giấu thông tin',
+    sharedImages: 'Ảnh chia sẻ',
     yourImages: 'Ảnh của bạn',
     refreshLibrary: 'Làm mới thư viện',
     notification: 'Thông báo',
@@ -197,6 +224,8 @@ const i18n = {
     areYouSure: 'Bạn có chắc không?',
     imageNumber: 'ảnh #{n}',
     view: 'Xem',
+    share: 'Chia sẻ',
+    unshare: 'Bỏ chia sẻ',
     download: 'Tải xuống',
     delete: 'Xóa',
     resolutionLoading: 'đang tải...',
@@ -322,6 +351,7 @@ const photoInputEl = document.getElementById('photo');
 const cropModalEl = document.getElementById('cropModal');
 const cropImageEl = document.getElementById('cropImage');
 const cropPreviewEl = document.getElementById('cropPreview');
+const cropCaptionInputEl = document.getElementById('cropCaptionInput');
 const cropCancelEl = document.getElementById('cropCancel');
 const cropApplyEl = document.getElementById('cropApply');
 const cropUseOriginalEl = document.getElementById('cropUseOriginal');
@@ -331,6 +361,10 @@ const cropRotateSliderEl = document.getElementById('cropRotateSlider');
 const cropRotateValueEl = document.getElementById('cropRotateValue');
 const filePickerBtnEl = document.getElementById('filePickerBtn');
 const filePickerNameEl = document.getElementById('filePickerName');
+const toggleMetadataEl = document.getElementById('toggleMetadata');
+const toggleMetadataSharedEl = document.getElementById('toggleMetadataShared');
+const loginPasswordInputEl = document.getElementById('password');
+const loginPasswordToggleEl = document.getElementById('toggleLoginPassword');
 const languageLabelEl = document.getElementById('languageLabel');
 const languageToggleEl = document.getElementById('languageToggle');
 const socket = window.io ? window.io({ withCredentials: true }) : null;
@@ -349,6 +383,7 @@ const versionMenuState = {
   versionNum: null,
   filePath: '',
   sizeBytes: null,
+  versionShared: false,
   hideTimer: null
 };
 const versionContextMenuEl = document.createElement('div');
@@ -357,8 +392,8 @@ versionContextMenuEl.hidden = true;
 versionContextMenuEl.innerHTML = `
   <button type="button" data-action="view">View</button>
   <button type="button" data-action="download">Download</button>
+  <button type="button" data-action="share">Share</button>
   <button type="button" data-action="delete" class="danger">Delete</button>
-  <div class="version-context-meta" data-meta>Size: - | Resolution: -</div>
 `;
 document.body.appendChild(versionContextMenuEl);
 const versionViewModalEl = document.createElement('div');
@@ -430,6 +465,25 @@ function updateCropModalTitle() {
   cropTitleEl.textContent = cropMode === 'edit-original' ? t('editOriginal') : t('uploadImage');
 }
 
+function syncMetadataToggleButtons() {
+  const label = state.showImageMetadata ? t('hideMetadata') : t('showMetadata');
+  [toggleMetadataEl, toggleMetadataSharedEl].forEach((btn) => {
+    if (!btn) return;
+    btn.textContent = label;
+    btn.setAttribute('aria-label', label);
+    btn.title = label;
+  });
+}
+
+function syncLoginPasswordToggle() {
+  if (!loginPasswordInputEl || !loginPasswordToggleEl) return;
+  const showing = loginPasswordInputEl.type === 'text';
+  const label = showing ? t('hidePassword') : t('showPassword');
+  loginPasswordToggleEl.setAttribute('aria-label', label);
+  loginPasswordToggleEl.title = label;
+  loginPasswordToggleEl.setAttribute('aria-pressed', showing ? 'true' : 'false');
+}
+
 function applyLanguage() {
   document.documentElement.lang = currentLang === 'vi' ? 'vi' : 'en';
   document.title = t('title');
@@ -459,6 +513,7 @@ function applyLanguage() {
   if (filePickerBtnEl) filePickerBtnEl.textContent = getFilePickerText('chooseFile');
   updateFilePickerLabel(photoInputEl?.files?.[0] || null);
   setText('yourImagesTitle', 'yourImages');
+  setText('sharedImagesTitle', 'sharedImages');
   setText('noticeTitle', 'notification');
   setText('noticeClose', 'close');
   setText('confirmTitle', 'confirmAction');
@@ -483,6 +538,8 @@ function applyLanguage() {
   setText('cropRotateLabel', 'rotate');
   setText('cropRotateLeft', 'rotateLeft');
   setText('cropRotateRight', 'rotateRight');
+  setText('cropCaptionLabel', 'caption');
+  setPlaceholder('cropCaptionInput', 'captionPlaceholder');
   if (cropRotateValueEl) cropRotateValueEl.textContent = `${Math.round(Number(cropRotationDeg) || 0)}°`;
   const cropOrientationLabelEl = document.getElementById('cropOrientationLabel');
   if (cropOrientationLabelEl) {
@@ -525,9 +582,11 @@ function applyLanguage() {
 
   const viewBtn = versionContextMenuEl.querySelector('button[data-action="view"]');
   const downloadBtn = versionContextMenuEl.querySelector('button[data-action="download"]');
+  const shareBtn = versionContextMenuEl.querySelector('button[data-action="share"]');
   const deleteBtn = versionContextMenuEl.querySelector('button[data-action="delete"]');
   if (viewBtn) viewBtn.textContent = t('view');
   if (downloadBtn) downloadBtn.textContent = t('download');
+  if (shareBtn) shareBtn.textContent = t('share');
   if (deleteBtn) deleteBtn.textContent = t('delete');
   if (versionMenuMetaEl) {
     versionMenuMetaEl.textContent = t('sizeLine', {
@@ -538,7 +597,9 @@ function applyLanguage() {
 
   updateSliderLabels();
   updatePreviewSizeLabels();
+  syncMetadataToggleButtons();
   renderImageList();
+  renderSharedImageList();
   if (state.currentUser && state.currentUser.email) {
     accountLabelEl.textContent = t('signedInAs', { email: state.currentUser.email });
   }
@@ -903,6 +964,7 @@ function hideVersionMenu() {
   versionMenuState.versionNum = null;
   versionMenuState.filePath = '';
   versionMenuState.sizeBytes = null;
+  versionMenuState.versionShared = false;
 }
 
 function loadImageDimensions(filePath) {
@@ -932,7 +994,16 @@ function updateFilePickerLabel(file) {
 
 function getImageRowById(imageId) {
   const n = Number(imageId);
-  return state.images.find((row) => Number(row.id) === n) || null;
+  return state.images.find((row) => Number(row.id) === n)
+    || state.sharedImages.find((row) => Number(row.id) === n)
+    || null;
+}
+
+function isVersionShared(imageId, versionNum) {
+  const row = state.images.find((img) => Number(img.id) === Number(imageId));
+  if (!row) return false;
+  const version = (row.versions || []).find((v) => Number(v.version_num) === Number(versionNum));
+  return Boolean(version && version.is_shared);
 }
 
 function getOriginalPathForImage(imageId) {
@@ -970,7 +1041,7 @@ function setVersionViewSource(showOriginal) {
 function updateVersionViewNavButtons() {
   const image = getImageRowById(versionViewState.imageId);
   const enhancedVersions = getEnhancedVersions(image);
-  const hasNav = enhancedVersions.length > 1 && versionViewState.enhancedVersionIndex >= 0;
+  const hasNav = Boolean(versionViewState.imageId) && enhancedVersions.length > 0;
   if (versionViewPrevEl) versionViewPrevEl.hidden = !hasNav;
   if (versionViewNextEl) versionViewNextEl.hidden = !hasNav;
 }
@@ -978,13 +1049,22 @@ function updateVersionViewNavButtons() {
 function browseVersionInModal(direction) {
   const image = getImageRowById(versionViewState.imageId);
   const enhancedVersions = getEnhancedVersions(image);
-  if (enhancedVersions.length <= 1) return;
-  let idx = Number(versionViewState.enhancedVersionIndex);
-  if (!Number.isInteger(idx) || idx < 0 || idx >= enhancedVersions.length) idx = 0;
-  idx = (idx + (direction >= 0 ? 1 : -1) + enhancedVersions.length) % enhancedVersions.length;
-  const target = enhancedVersions[idx];
+  if (enhancedVersions.length === 0) return;
+
   const originalPath = getOriginalPathForImage(versionViewState.imageId);
-  openVersionViewModal(target.file_path, originalPath, versionViewState.imageId);
+  const hasOriginal = Boolean(originalPath);
+  const candidates = hasOriginal
+    ? [originalPath, ...enhancedVersions.map((v) => v.file_path).filter(Boolean)]
+    : enhancedVersions.map((v) => v.file_path).filter(Boolean);
+
+  if (candidates.length <= 1) return;
+
+  const currentPath = versionViewState.enhancedPath;
+  let idx = candidates.findIndex((path) => path === currentPath);
+  if (idx < 0) idx = 0;
+  idx = (idx + (direction >= 0 ? 1 : -1) + candidates.length) % candidates.length;
+  const targetPath = candidates[idx];
+  openVersionViewModal(targetPath, originalPath, versionViewState.imageId);
 }
 
 function openVersionViewModal(filePath, originalPath = '', imageId = null) {
@@ -1043,23 +1123,21 @@ function closeVersionViewModal() {
   }
 }
 
-function showVersionMenu(imageId, versionNum, filePath, sizeBytes, event) {
+function showVersionMenu(imageId, versionNum, filePath, sizeBytes, event, versionShared = null) {
   versionMenuState.imageId = Number(imageId);
   versionMenuState.versionNum = Number(versionNum);
   versionMenuState.filePath = filePath || '';
   versionMenuState.sizeBytes = Number.isFinite(Number(sizeBytes)) ? Number(sizeBytes) : null;
+  versionMenuState.versionShared = versionShared === null ? isVersionShared(imageId, versionNum) : Boolean(versionShared);
+  const shareBtn = versionContextMenuEl.querySelector('button[data-action="share"]');
+  if (shareBtn) {
+    shareBtn.textContent = versionMenuState.versionShared ? t('unshare') : t('share');
+  }
   if (versionMenuDeleteBtnEl) {
     versionMenuDeleteBtnEl.hidden = Number(versionNum) <= 1;
   }
-  if (versionMenuMetaEl) {
-    versionMenuMetaEl.textContent = t('sizeLine', {
-      size: formatBytes(versionMenuState.sizeBytes),
-      resolution: t('resolutionLoading')
-    });
-  }
-
   const menuW = 140;
-  const menuH = 108;
+  const menuH = 118;
   const vw = window.innerWidth || document.documentElement.clientWidth || 0;
   const vh = window.innerHeight || document.documentElement.clientHeight || 0;
   const margin = 8;
@@ -1086,23 +1164,15 @@ function showVersionMenu(imageId, versionNum, filePath, sizeBytes, event) {
   versionContextMenuEl.style.left = `${x}px`;
   versionContextMenuEl.style.top = `${y}px`;
   versionContextMenuEl.hidden = false;
-
-  loadImageDimensions(filePath).then((dims) => {
-    if (!versionMenuMetaEl) return;
-    if (versionMenuState.filePath !== filePath || versionContextMenuEl.hidden) return;
-    const sizeText = formatBytes(versionMenuState.sizeBytes);
-    if (!dims) {
-      versionMenuMetaEl.textContent = t('sizeLine', { size: sizeText, resolution: t('resolutionDash') });
-      return;
-    }
-    versionMenuMetaEl.textContent = t('sizeLine', { size: sizeText, resolution: `${dims.width}x${dims.height}px` });
-  });
 }
 
 function openCropModal(imageUrl, options = {}) {
   cropMode = options.mode === 'edit-original' ? 'edit-original' : 'upload';
   cropTargetImageId = Number(options.imageId) || null;
   cropSourceFile = options.sourceFile || photoInputEl.files[0] || null;
+  if (cropCaptionInputEl) {
+    cropCaptionInputEl.value = String(options.caption || '').slice(0, 1000);
+  }
   updateCropModalTitle();
   if (!window.Cropper) {
     pendingUploadFile = cropSourceFile;
@@ -1141,6 +1211,7 @@ function closeCropModal() {
   cropMode = 'upload';
   cropTargetImageId = null;
   cropSourceFile = null;
+  if (cropCaptionInputEl) cropCaptionInputEl.value = '';
 }
 
 function setCropRotation(nextDeg) {
@@ -1221,14 +1292,23 @@ function renderImageList() {
     const topRow = document.createElement('div');
     topRow.className = 'image-top-row';
 
-    const icon = document.createElement('span');
+    const icon = document.createElement('button');
+    icon.type = 'button';
     icon.className = 'image-icon';
+    icon.setAttribute('aria-label', `${t('view')}: ${row.original_name || `image-${row.id}`}`);
     const iconImg = document.createElement('img');
     iconImg.alt = row.original_name || `image-${row.id}`;
     iconImg.src = row.original_path || row.current_path || '';
     iconImg.loading = 'lazy';
     iconImg.onerror = () => {
       icon.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM7 9a2 2 0 1 0 0.001 0zM6 17h12l-4-5-3 4-2-2z"/></svg>';
+    };
+    icon.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const originalPath = getOriginalPathForImage(row.id);
+      if (!originalPath) return;
+      openVersionViewModal(originalPath, originalPath, row.id);
     };
     icon.appendChild(iconImg);
 
@@ -1252,9 +1332,14 @@ function renderImageList() {
       chip.type = 'button';
       chip.className = 'version-chip';
       chip.textContent = String(v.version_num);
+      if (v.is_shared) {
+        chip.classList.add('shared');
+        chip.title = t('shared');
+        chip.setAttribute('aria-label', `${t('shared')} ${v.version_num}`);
+      }
       chip.onmouseenter = (e) => {
         clearVersionMenuHideTimer();
-        showVersionMenu(row.id, v.version_num, v.file_path, v.size_bytes, e);
+        showVersionMenu(row.id, v.version_num, v.file_path, v.size_bytes, e, v.is_shared);
       };
       chip.onmouseleave = () => {
         scheduleHideVersionMenu();
@@ -1268,7 +1353,7 @@ function renderImageList() {
       chip.oncontextmenu = (e) => {
         e.preventDefault();
         e.stopPropagation();
-        showVersionMenu(row.id, v.version_num, v.file_path, v.size_bytes, e);
+        showVersionMenu(row.id, v.version_num, v.file_path, v.size_bytes, e, v.is_shared);
       };
       versions.appendChild(chip);
     });
@@ -1281,7 +1366,15 @@ function renderImageList() {
 
     topRow.appendChild(versions);
     metaWrap.appendChild(topRow);
-    metaWrap.appendChild(meta);
+    if (state.showImageMetadata) {
+      metaWrap.appendChild(meta);
+    }
+    if (row.caption) {
+      const captionTextEl = document.createElement('span');
+      captionTextEl.className = 'image-caption-text';
+      captionTextEl.textContent = row.caption;
+      metaWrap.appendChild(captionTextEl);
+    }
     metaWrap.onclick = () => setSelectedImage(row);
 
     const actions = document.createElement('div');
@@ -1309,7 +1402,8 @@ function renderImageList() {
         openCropModal(objectUrl, {
           mode: 'edit-original',
           imageId: row.id,
-          sourceFile
+          sourceFile,
+          caption: row.caption || ''
         });
       } catch (err) {
         log(err.message || t('versionActionFailed'));
@@ -1325,6 +1419,95 @@ function renderImageList() {
     actions.appendChild(deleteBtn);
     li.appendChild(metaWrap);
     li.appendChild(actions);
+    list.appendChild(li);
+  });
+}
+
+function renderSharedImageList() {
+  const list = document.getElementById('sharedImages');
+  if (!list) return;
+  list.innerHTML = '';
+
+  state.sharedImages.forEach((row) => {
+    const li = document.createElement('li');
+
+    const metaWrap = document.createElement('div');
+    metaWrap.className = 'image-meta';
+    const topRow = document.createElement('div');
+    topRow.className = 'image-top-row';
+
+    const icon = document.createElement('button');
+    icon.type = 'button';
+    icon.className = 'image-icon';
+    icon.setAttribute('aria-label', `${t('view')}: ${row.original_name || `image-${row.id}`}`);
+    const iconImg = document.createElement('img');
+    iconImg.alt = row.original_name || `image-${row.id}`;
+    iconImg.src = row.original_path || row.current_path || '';
+    iconImg.loading = 'lazy';
+    iconImg.onerror = () => {
+      icon.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM7 9a2 2 0 1 0 0.001 0zM6 17h12l-4-5-3 4-2-2z"/></svg>';
+    };
+    icon.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const originalPath = getOriginalPathForImage(row.id);
+      if (!originalPath) return;
+      openVersionViewModal(originalPath, originalPath, row.id);
+    };
+    icon.appendChild(iconImg);
+    topRow.appendChild(icon);
+
+    const versions = document.createElement('div');
+    versions.className = 'version-row';
+    const versionTitle = document.createElement('span');
+    versionTitle.className = 'version-title';
+    versionTitle.textContent = t('versions');
+    versions.appendChild(versionTitle);
+    (row.versions || []).forEach((v) => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'version-chip';
+      chip.textContent = String(v.version_num);
+      if (v.is_shared !== false) {
+        chip.classList.add('shared');
+        chip.title = t('shared');
+        chip.setAttribute('aria-label', `${t('shared')} ${v.version_num}`);
+      }
+      chip.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const originalPath = Number(v.version_num) > 1 ? getOriginalPathForImage(row.id) : '';
+        openVersionViewModal(v.file_path, originalPath, row.id);
+      };
+      versions.appendChild(chip);
+    });
+    if (!row.versions || row.versions.length === 0) {
+      const noVersion = document.createElement('span');
+      noVersion.className = 'version-empty';
+      noVersion.textContent = '1';
+      versions.appendChild(noVersion);
+    }
+    topRow.appendChild(versions);
+
+    const meta = document.createElement('span');
+    meta.className = 'image-caption';
+    const owner = row.owner_email ? ` | ${t('sharedBy', { email: row.owner_email })}` : '';
+    meta.textContent = `${t('imageCaption', {
+      name: row.original_name,
+      size: formatBytes(row.current_size_bytes),
+      time: formatUploadedAt(row.created_at)
+    })}${owner}`;
+    metaWrap.appendChild(topRow);
+    if (state.showImageMetadata) {
+      metaWrap.appendChild(meta);
+    }
+    if (row.caption) {
+      const captionTextEl = document.createElement('span');
+      captionTextEl.className = 'image-caption-text';
+      captionTextEl.textContent = row.caption;
+      metaWrap.appendChild(captionTextEl);
+    }
+    li.appendChild(metaWrap);
     list.appendChild(li);
   });
 }
@@ -1395,6 +1578,7 @@ document.getElementById('logout').onclick = async () => {
     document.getElementById('password').value = '';
     setAuthUI(null);
     state.images = [];
+    state.sharedImages = [];
     state.selectedImageId = null;
     state.uploadedPreviewUrl = '';
     state.completedPreviewUrl = '';
@@ -1403,6 +1587,7 @@ document.getElementById('logout').onclick = async () => {
     state.pendingEnhancedPath = '';
     forcePasswordRequired = false;
     renderImageList();
+    renderSharedImageList();
     renderPreviews();
     log(t('loggedOut'));
   } catch (e) {
@@ -1410,12 +1595,13 @@ document.getElementById('logout').onclick = async () => {
   }
 };
 
-async function uploadPendingOrSelectedFile() {
+async function uploadPendingOrSelectedFile(caption = '') {
   const file = pendingUploadFile || photoInputEl.files[0];
   if (!file) throw new Error(t('selectImageFirst'));
 
   const form = new FormData();
   form.append('photo', file);
+  form.append('caption', String(caption || '').trim().slice(0, 1000));
   const data = await api('/api/images/upload', { method: 'POST', body: form });
 
   state.selectedImageId = data.imageId;
@@ -1431,10 +1617,11 @@ async function uploadPendingOrSelectedFile() {
   await refreshImages();
 }
 
-async function updateOriginalImage(imageId, file) {
+async function updateOriginalImage(imageId, file, caption = '') {
   if (!imageId || !file) throw new Error(t('selectImageFirst'));
   const form = new FormData();
   form.append('photo', file);
+  form.append('caption', String(caption || '').trim().slice(0, 1000));
   await api(`/api/images/${imageId}/original`, { method: 'POST', body: form });
   state.selectedImageId = imageId;
   state.pendingEnhancedPath = '';
@@ -1553,8 +1740,19 @@ async function refreshImages() {
   if (isRefreshingImages) return;
   isRefreshingImages = true;
   try {
-    const data = await api('/api/images');
-    state.images = [...data].sort((a, b) => {
+    const [mine, shared] = await Promise.all([
+      api('/api/images'),
+      api('/api/images/shared')
+    ]);
+    state.images = [...mine].sort((a, b) => {
+      const aTs = new Date(a.created_at || 0).getTime();
+      const bTs = new Date(b.created_at || 0).getTime();
+      if (Number.isFinite(aTs) && Number.isFinite(bTs) && aTs !== bTs) {
+        return bTs - aTs;
+      }
+      return Number(b.id || 0) - Number(a.id || 0);
+    });
+    state.sharedImages = [...shared].sort((a, b) => {
       const aTs = new Date(a.created_at || 0).getTime();
       const bTs = new Date(b.created_at || 0).getTime();
       if (Number.isFinite(aTs) && Number.isFinite(bTs) && aTs !== bTs) {
@@ -1563,6 +1761,7 @@ async function refreshImages() {
       return Number(b.id || 0) - Number(a.id || 0);
     });
     renderImageList();
+    renderSharedImageList();
 
     if (state.selectedImageId) {
       const selected = state.images.find((x) => x.id === state.selectedImageId);
@@ -1588,6 +1787,33 @@ document.getElementById('refresh').onclick = async () => {
     log(e.message);
   }
 };
+
+if (toggleMetadataEl) {
+  toggleMetadataEl.addEventListener('click', () => {
+    state.showImageMetadata = !state.showImageMetadata;
+    window.localStorage.setItem(METADATA_VIS_KEY, String(state.showImageMetadata));
+    syncMetadataToggleButtons();
+    renderImageList();
+    renderSharedImageList();
+  });
+}
+
+if (toggleMetadataSharedEl) {
+  toggleMetadataSharedEl.addEventListener('click', () => {
+    state.showImageMetadata = !state.showImageMetadata;
+    window.localStorage.setItem(METADATA_VIS_KEY, String(state.showImageMetadata));
+    syncMetadataToggleButtons();
+    renderImageList();
+    renderSharedImageList();
+  });
+}
+
+if (loginPasswordToggleEl && loginPasswordInputEl) {
+  loginPasswordToggleEl.addEventListener('click', () => {
+    loginPasswordInputEl.type = loginPasswordInputEl.type === 'password' ? 'text' : 'password';
+    syncLoginPasswordToggle();
+  });
+}
 
 closeEnhanceModalEl.addEventListener('click', closeEnhanceModal);
 resetAdjustmentsBtnEl.addEventListener('click', () => {
@@ -1621,7 +1847,7 @@ photoInputEl.addEventListener('change', () => {
   updateFilePickerLabel(file || null);
   if (!file) return;
   const objectUrl = URL.createObjectURL(file);
-  openCropModal(objectUrl, { mode: 'upload', sourceFile: file });
+  openCropModal(objectUrl, { mode: 'upload', sourceFile: file, caption: '' });
 });
 
 cropCancelEl.addEventListener('click', () => {
@@ -1642,6 +1868,7 @@ cropApplyEl.addEventListener('click', () => {
     if (!blob) return;
     const mode = cropMode;
     const targetImageId = cropTargetImageId;
+    const caption = String(cropCaptionInputEl?.value || '').trim().slice(0, 1000);
     const originalName = (cropSourceFile && cropSourceFile.name) || (photoInputEl.files[0] && photoInputEl.files[0].name) || 'cropped.jpg';
     pendingUploadFile = new File([blob], originalName, { type: blob.type || 'image/jpeg' });
     state.uploadedPreviewUrl = URL.createObjectURL(pendingUploadFile);
@@ -1652,9 +1879,9 @@ cropApplyEl.addEventListener('click', () => {
     renderPreviews();
     closeCropModal();
     if (mode === 'edit-original' && targetImageId) {
-      updateOriginalImage(targetImageId, pendingUploadFile).catch((e) => log(e.message));
+      updateOriginalImage(targetImageId, pendingUploadFile, caption).catch((e) => log(e.message));
     } else {
-      uploadPendingOrSelectedFile().catch((e) => log(e.message));
+      uploadPendingOrSelectedFile(caption).catch((e) => log(e.message));
     }
   }, 'image/jpeg', 0.95);
 });
@@ -1664,6 +1891,7 @@ cropUseOriginalEl.addEventListener('click', () => {
   if (!original) return;
   const mode = cropMode;
   const targetImageId = cropTargetImageId;
+  const caption = String(cropCaptionInputEl?.value || '').trim().slice(0, 1000);
   pendingUploadFile = original;
   state.uploadedPreviewUrl = URL.createObjectURL(original);
   state.beforeBytes = original.size;
@@ -1673,9 +1901,9 @@ cropUseOriginalEl.addEventListener('click', () => {
   renderPreviews();
   closeCropModal();
   if (mode === 'edit-original' && targetImageId) {
-    updateOriginalImage(targetImageId, pendingUploadFile).catch((e) => log(e.message));
+    updateOriginalImage(targetImageId, pendingUploadFile, caption).catch((e) => log(e.message));
   } else {
-    uploadPendingOrSelectedFile().catch((e) => log(e.message));
+    uploadPendingOrSelectedFile(caption).catch((e) => log(e.message));
   }
 });
 
@@ -1715,6 +1943,7 @@ versionContextMenuEl.addEventListener('click', async (e) => {
   const imageId = Number(versionMenuState.imageId);
   const versionNum = Number(versionMenuState.versionNum);
   const filePath = versionMenuState.filePath;
+  const versionShared = Boolean(versionMenuState.versionShared);
   hideVersionMenu();
 
   try {
@@ -1727,6 +1956,19 @@ versionContextMenuEl.addEventListener('click', async (e) => {
     }
     if (action === 'download') {
       downloadImage(imageId, [versionNum]);
+      return;
+    }
+    if (action === 'share') {
+      const nextShared = !versionShared;
+      await api(`/api/images/${imageId}/share`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ version: versionNum, shared: nextShared })
+      });
+      await refreshImages();
+      log(nextShared
+        ? t('sharedImageEnabled', { version: versionNum })
+        : t('sharedImageDisabled', { version: versionNum }), { popup: true });
       return;
     }
     if (action === 'delete') {
@@ -1744,6 +1986,10 @@ versionContextMenuEl.addEventListener('click', async (e) => {
       log(t('deletedVersion', { version: versionNum }), { popup: true });
     }
   } catch (err) {
+    if (action === 'share') {
+      log(err.message || t('shareActionFailed'));
+      return;
+    }
     log(err.message || t('versionActionFailed'));
   }
 });
@@ -1827,6 +2073,7 @@ if (languageToggleEl) {
 }
 
 applyLanguage();
+syncLoginPasswordToggle();
 refreshImages().catch(() => {});
 renderPreviews();
 syncUseEnhancedButton();

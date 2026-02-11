@@ -28,7 +28,14 @@
         </div>
         <div id="authGuest" class="grid-3">
           <input id="email" type="email" placeholder="Email" />
-          <input id="password" type="password" placeholder="Password" />
+          <div class="password-field">
+            <input id="password" type="password" placeholder="Password" />
+            <button id="toggleLoginPassword" type="button" class="password-toggle ghost" aria-label="Show Password" title="Show Password">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 5c5.3 0 9.7 3.8 11 7-1.3 3.2-5.7 7-11 7s-9.7-3.8-11-7c1.3-3.2 5.7-7 11-7zm0 2C8 7 4.5 9.7 3.2 12 4.5 14.3 8 17 12 17s7.5-2.7 8.8-5C19.5 9.7 16 7 12 7zm0 2.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5z"/>
+              </svg>
+            </button>
+          </div>
           <div class="btn-row">
             <button id="login">Login</button>
           </div>
@@ -57,11 +64,22 @@
       <section id="panelImages" class="panel auth-only">
         <div class="panel-head">
           <h2 id="yourImagesTitle">Your Images</h2>
-          <button id="refresh" class="icon-btn ghost" aria-label="Refresh Library" title="Refresh Library">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5a7 7 0 0 1 6.65 4.8H21l-3.4 3.9-3.6-3.9h2.6A5 5 0 1 0 17 14h2a7 7 0 1 1-7-9z"/></svg>
-          </button>
+          <div class="btn-row">
+            <button id="toggleMetadata" class="ghost subtle-btn" type="button">Hide Metadata</button>
+            <button id="refresh" class="icon-btn ghost" aria-label="Refresh Library" title="Refresh Library">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5a7 7 0 0 1 6.65 4.8H21l-3.4 3.9-3.6-3.9h2.6A5 5 0 1 0 17 14h2a7 7 0 1 1-7-9z"/></svg>
+            </button>
+          </div>
         </div>
         <ul id="images" class="image-list"></ul>
+      </section>
+
+      <section id="panelSharedImages" class="panel auth-only">
+        <div class="panel-head">
+          <h2 id="sharedImagesTitle">Shared Images</h2>
+          <button id="toggleMetadataShared" class="ghost subtle-btn" type="button">Hide Metadata</button>
+        </div>
+        <ul id="sharedImages" class="image-list"></ul>
       </section>
 
       <div id="noticeModal" class="notice-modal" hidden>
@@ -220,6 +238,10 @@
               <span id="cropOrientationLabel" class="crop-tools-label">Orientation: <b id="cropRotateValue">0°</b></span>
               <input id="cropRotateSlider" type="range" min="-180" max="180" step="1" value="0" />
             </label>
+          </div>
+          <div class="crop-caption-row">
+            <label id="cropCaptionLabel" for="cropCaptionInput">Caption</label>
+            <input id="cropCaptionInput" type="text" placeholder="Image caption (optional)" maxlength="1000" />
           </div>
           <div class="crop-actions">
             <button id="cropCancel" class="ghost">Cancel</button>

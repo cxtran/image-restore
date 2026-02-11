@@ -102,10 +102,34 @@ async function ensureForcePasswordColumn() {
   }
 }
 
+async function ensureImageSharedColumn() {
+  const [rows] = await db.query("SHOW COLUMNS FROM images LIKE 'is_shared'");
+  if (rows.length === 0) {
+    await db.query('ALTER TABLE images ADD COLUMN is_shared TINYINT(1) NOT NULL DEFAULT 0');
+  }
+}
+
+async function ensureImageCaptionColumn() {
+  const [rows] = await db.query("SHOW COLUMNS FROM images LIKE 'caption'");
+  if (rows.length === 0) {
+    await db.query('ALTER TABLE images ADD COLUMN caption TEXT NULL');
+  }
+}
+
+async function ensureImageVersionSharedColumn() {
+  const [rows] = await db.query("SHOW COLUMNS FROM image_versions LIKE 'is_shared'");
+  if (rows.length === 0) {
+    await db.query('ALTER TABLE image_versions ADD COLUMN is_shared TINYINT(1) NOT NULL DEFAULT 0');
+  }
+}
+
 async function bootstrap() {
   try {
     await ensureRoleColumn();
     await ensureForcePasswordColumn();
+    await ensureImageSharedColumn();
+    await ensureImageCaptionColumn();
+    await ensureImageVersionSharedColumn();
     server.listen(PORT, () => {
       console.log(`Image Restore Studio running on port ${PORT}`);
     });

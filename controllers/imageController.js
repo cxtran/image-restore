@@ -61,9 +61,10 @@ exports.uploadPhoto = async (req, res) => {
 
   try {
     const relPath = `/uploads/${req.file.filename}`;
+    const caption = req.body?.caption ? String(req.body.caption).trim().slice(0, 1000) : null;
     const [result] = await db.query(
-      'INSERT INTO images (user_id, original_name, original_path, current_path) VALUES (?, ?, ?, ?)',
-      [req.user.id, req.file.originalname, relPath, relPath]
+      'INSERT INTO images (user_id, original_name, caption, original_path, current_path) VALUES (?, ?, ?, ?, ?)',
+      [req.user.id, req.file.originalname, caption, relPath, relPath]
     );
 
     await db.query(
@@ -89,13 +90,24 @@ exports.replaceOriginalImage = async (req, res) => {
     const newOriginalPath = `/uploads/${req.file.filename}`;
     const oldOriginalPath = image.original_path;
     const shouldUpdateCurrentPath = String(image.current_path || '') === String(oldOriginalPath || '');
+    const hasCaption = Object.prototype.hasOwnProperty.call(req.body || {}, 'caption');
+    const nextCaption = hasCaption ? String(req.body?.caption || '').trim().slice(0, 1000) : null;
 
-    await db.query('UPDATE images SET original_path = ?, current_path = IF(? = 1, ?, current_path) WHERE id = ?', [
+    await db.query(
+      `UPDATE images
+       SET original_path = ?,
+           current_path = IF(? = 1, ?, current_path),
+           caption = IF(? = 1, ?, caption)
+       WHERE id = ?`,
+      [
       newOriginalPath,
       shouldUpdateCurrentPath ? 1 : 0,
       newOriginalPath,
+      hasCaption ? 1 : 0,
+      nextCaption,
       imageId
-    ]);
+      ]
+    );
 
     await db.query(
       'UPDATE image_versions SET file_path = ?, operations_json = ? WHERE image_id = ? AND version_num = 1',
@@ -120,8 +132,8 @@ exports.replaceOriginalImage = async (req, res) => {
 exports.listMyImages = async (req, res) => {
   try {
     const [rows] = await db.query(
-      `SELECT i.id, i.original_name, i.original_path, i.current_path, i.created_at, i.updated_at,
-              v.version_num, v.file_path, v.created_at AS version_created_at
+      `SELECT i.id, i.original_name, i.caption, i.original_path, i.current_path, i.created_at, i.updated_at,
+              v.version_num, v.file_path, v.is_shared AS version_is_shared, v.created_at AS version_created_at
        FROM images i
        LEFT JOIN image_versions v ON v.image_id = i.id
        WHERE i.user_id = ?
@@ -135,6 +147,7 @@ exports.listMyImages = async (req, res) => {
         byId.set(row.id, {
           id: row.id,
           original_name: row.original_name,
+          caption: row.caption || '',
           original_path: row.original_path,
           current_path: row.current_path,
           created_at: row.created_at,
@@ -150,6 +163,7 @@ exports.listMyImages = async (req, res) => {
         image.versions.push({
           version_num: row.version_num,
           file_path: row.file_path,
+          is_shared: Number(row.version_is_shared) === 1,
           size_bytes: getFileSizeBytesFromRelPath(row.file_path),
           created_at: row.version_created_at
         });
@@ -163,6 +177,108 @@ exports.listMyImages = async (req, res) => {
     return res.json(enriched);
   } catch (error) {
     return res.status(500).json({ message: 'List failed', error: error.message });
+  }
+};
+
+exports.listSharedImages = async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      `SELECT i.id, i.user_id, u.email AS owner_email, i.original_name, i.caption, i.original_path, i.current_path, i.created_at, i.updated_at,
+              v.version_num, v.file_path, v.is_shared AS version_is_shared, v.created_at AS version_created_at
+       FROM images i
+       INNER JOIN users u ON u.id = i.user_id
+       INNER JOIN image_versions v ON v.image_id = i.id AND v.is_shared = 1
+       ORDER BY i.updated_at DESC, v.version_num ASC`,
+      []
+    );
+
+    const byId = new Map();
+    rows.forEach((row) => {
+      if (!byId.has(row.id)) {
+        byId.set(row.id, {
+          id: row.id,
+          user_id: row.user_id,
+          owner_email: row.owner_email,
+          original_name: row.original_name,
+          caption: row.caption || '',
+          original_path: row.original_path,
+          current_path: row.current_path,
+          created_at: row.created_at,
+          updated_at: row.updated_at,
+          original_size_bytes: getFileSizeBytesFromRelPath(row.original_path),
+          current_size_bytes: getFileSizeBytesFromRelPath(row.current_path),
+          versions: []
+        });
+      }
+
+      const image = byId.get(row.id);
+      if (row.version_num !== null && row.file_path) {
+        image.versions.push({
+          version_num: row.version_num,
+          file_path: row.file_path,
+          is_shared: Number(row.version_is_shared) === 1,
+          size_bytes: getFileSizeBytesFromRelPath(row.file_path),
+          created_at: row.version_created_at
+        });
+      }
+    });
+
+    const enriched = Array.from(byId.values()).map((image) => ({
+      ...image,
+      current_version: image.versions.length ? image.versions[image.versions.length - 1].version_num : 1
+    }));
+    return res.json(enriched);
+  } catch (error) {
+    return res.status(500).json({ message: 'List shared images failed', error: error.message });
+  }
+};
+
+exports.updateImageCaption = async (req, res) => {
+  const imageId = Number(req.params.id);
+  const caption = req.body?.caption === undefined || req.body?.caption === null
+    ? ''
+    : String(req.body.caption).trim().slice(0, 1000);
+
+  try {
+    const [rows] = await db.query('SELECT id FROM images WHERE id = ? AND user_id = ?', [imageId, req.user.id]);
+    if (!rows[0]) return res.status(404).json({ message: 'Image not found' });
+
+    await db.query('UPDATE images SET caption = ? WHERE id = ?', [caption || null, imageId]);
+    return res.json({ message: 'Caption updated', imageId, caption });
+  } catch (error) {
+    return res.status(500).json({ message: 'Caption update failed', error: error.message });
+  }
+};
+
+exports.setImageShared = async (req, res) => {
+  const imageId = Number(req.params.id);
+  const versionNum = Number(req.body?.version);
+  const shared = Boolean(req.body && req.body.shared);
+  if (!Number.isInteger(versionNum) || versionNum < 1) {
+    return res.status(400).json({ message: 'version must be an integer >= 1' });
+  }
+  try {
+    const [rows] = await db.query(
+      `SELECT iv.image_id, iv.version_num
+       FROM image_versions iv
+       INNER JOIN images i ON i.id = iv.image_id
+       WHERE i.id = ? AND i.user_id = ? AND iv.version_num = ?`,
+      [imageId, req.user.id, versionNum]
+    );
+    if (!rows[0]) return res.status(404).json({ message: 'Image not found' });
+
+    await db.query(
+      'UPDATE image_versions SET is_shared = ? WHERE image_id = ? AND version_num = ?',
+      [shared ? 1 : 0, imageId, versionNum]
+    );
+    return res.json({
+      message: shared ? 'Image version shared' : 'Image version unshared',
+      imageId,
+      version: versionNum,
+      is_shared: shared
+    });
+  } catch (error) {
+    return res.status(500).json({ message: 'Share update failed', error: error.message });
   }
 };
 

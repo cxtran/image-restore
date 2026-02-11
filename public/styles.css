@@ -270,6 +270,39 @@ button.ghost.danger:hover {
   gap: 8px;
 }
 
+.password-field {
+  position: relative;
+  width: 100%;
+}
+
+.password-field input {
+  width: 100%;
+  padding-right: 42px;
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  padding: 0;
+  border: 1px solid #c3d1d8;
+  background: #fff;
+  color: #4f6472;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.password-toggle svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
 .auth-message {
   margin: 8px 0 0;
   font-size: 13px;
@@ -458,6 +491,15 @@ button.ghost.danger:hover {
   color: #4f6472;
   font-weight: 400;
 }
+.image-caption-text {
+  display: block;
+  margin-top: 4px;
+  color: #274455;
+  font-size: 12px;
+  font-style: italic;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 .image-icon {
   width: 52px;
   height: 52px;
@@ -468,6 +510,13 @@ button.ghost.danger:hover {
   justify-content: center;
   background: #f3f9fc;
   flex: 0 0 auto;
+  padding: 0;
+  cursor: pointer;
+}
+
+button.image-icon {
+  appearance: none;
+  -webkit-appearance: none;
 }
 .image-icon svg {
   width: 24px;
@@ -536,6 +585,13 @@ button.ghost.danger:hover {
   background: #1f6b84;
   color: #fff;
   border-color: #1f6b84;
+}
+
+.version-chip.shared {
+  background: #e8f6ee;
+  color: #1d6c43;
+  border-color: #8fc8a8;
+  font-weight: 700;
 }
 
 .version-hover-popup {
@@ -979,6 +1035,24 @@ button.ghost.danger:hover {
 
 .crop-rotate-slider-wrap input[type='range'] {
   width: min(260px, 58vw);
+}
+
+.crop-caption-row {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.crop-caption-row label {
+  font-size: 13px;
+  color: #38505f;
+  font-weight: 600;
+  min-width: 62px;
+}
+
+.crop-caption-row input {
+  flex: 1 1 auto;
 }
 
 .crop-actions {
