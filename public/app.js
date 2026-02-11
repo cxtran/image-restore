@@ -27,6 +27,7 @@ const LANG_KEY = 'ui_language';
 const METADATA_VIS_KEY = 'show_image_metadata';
 const SHARED_LAYOUT_KEY = 'shared_images_layout';
 const SHARED_CAPTION_VIS_KEY = 'show_shared_captions';
+const YOUR_LAYOUT_KEY = 'your_images_layout';
 const supportedLanguages = new Set(['en', 'vi']);
 let currentLang = (() => {
   const saved = String(window.localStorage.getItem(LANG_KEY) || 'en').toLowerCase();
@@ -46,6 +47,12 @@ state.showSharedCaptions = (() => {
   const saved = String(window.localStorage.getItem(SHARED_CAPTION_VIS_KEY) || '').toLowerCase();
   if (saved === 'false') return false;
   return true;
+})();
+state.yourLayout = (() => {
+  const saved = String(window.localStorage.getItem(YOUR_LAYOUT_KEY) || '').toLowerCase();
+  if (saved === 'tile') return 'tile';
+  if (saved === 'masonry') return 'masonry';
+  return 'list';
 })();
 
 const i18n = {
@@ -68,6 +75,7 @@ const i18n = {
     hideMetadata: 'Hide Image Info',
     showCaption: 'Show Caption',
     hideCaption: 'Hide Caption',
+    layoutList: 'Layout: List',
     layoutTile: 'Layout: Tile',
     layoutMasonry: 'Layout: Masonry',
     totalImages: 'Total Images: {count}',
@@ -193,6 +201,7 @@ const i18n = {
     hideMetadata: 'Giấu thông tin ảnh',
     showCaption: 'Hiển thị chú thích',
     hideCaption: 'Giấu chú thích',
+    layoutList: 'Bố cục: Danh sách',
     layoutTile: 'Bố cục: Ô',
     layoutMasonry: 'Bố cục: Masonry',
     totalImages: 'Tổng số ảnh: {count}',
@@ -384,6 +393,7 @@ const filePickerBtnEl = document.getElementById('filePickerBtn');
 const filePickerNameEl = document.getElementById('filePickerName');
 const toggleMetadataEl = document.getElementById('toggleMetadata');
 const toggleMetadataSharedEl = document.getElementById('toggleMetadataShared');
+const toggleYourLayoutEl = document.getElementById('toggleYourLayout');
 const toggleSharedLayoutEl = document.getElementById('toggleSharedLayout');
 const yourImagesCountEl = document.getElementById('yourImagesCount');
 const sharedImagesCountEl = document.getElementById('sharedImagesCount');
@@ -539,6 +549,22 @@ function syncSharedCaptionToggleUI() {
   toggleMetadataSharedEl.title = label;
 }
 
+function syncYourLayoutUI() {
+  const yourListEl = document.getElementById('images');
+  if (yourListEl) {
+    yourListEl.classList.toggle('your-layout-tile', state.yourLayout === 'tile');
+    yourListEl.classList.toggle('your-layout-masonry', state.yourLayout === 'masonry');
+  }
+  if (toggleYourLayoutEl) {
+    const label = state.yourLayout === 'tile'
+      ? t('layoutTile')
+      : (state.yourLayout === 'masonry' ? t('layoutMasonry') : t('layoutList'));
+    toggleYourLayoutEl.textContent = label;
+    toggleYourLayoutEl.setAttribute('aria-label', label);
+    toggleYourLayoutEl.title = label;
+  }
+}
+
 function applyLanguage() {
   document.documentElement.lang = currentLang === 'vi' ? 'vi' : 'en';
   document.title = t('title');
@@ -655,6 +681,7 @@ function applyLanguage() {
   syncMetadataToggleButtons();
   syncSharedLayoutUI();
   syncSharedCaptionToggleUI();
+  syncYourLayoutUI();
   syncImageCounts();
   renderImageList();
   renderSharedImageList();
@@ -1342,6 +1369,42 @@ function renderImageList() {
   const list = document.getElementById('images');
   list.innerHTML = '';
   syncImageCounts();
+  syncYourLayoutUI();
+
+  if (state.yourLayout === 'tile' || state.yourLayout === 'masonry') {
+    state.images.forEach((row) => {
+      const li = document.createElement('li');
+      const tileBtn = document.createElement('button');
+      tileBtn.type = 'button';
+      tileBtn.className = 'shared-image-tile-btn';
+      tileBtn.setAttribute('aria-label', `${t('view')}: ${row.original_name || `image-${row.id}`}`);
+      tileBtn.title = row.original_name || t('view');
+
+      const img = document.createElement('img');
+      img.alt = row.original_name || `image-${row.id}`;
+      img.src = state.yourLayout === 'masonry'
+        ? (row.current_path || row.original_path || row.icon_path || '')
+        : (row.icon_path || row.original_path || row.current_path || '');
+      img.loading = 'lazy';
+      img.onerror = () => {
+        img.src = row.original_path || row.current_path || '';
+      };
+
+      tileBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setSelectedImage(row);
+        const originalPath = getOriginalPathForImage(row.id);
+        if (!originalPath) return;
+        openVersionViewModal(originalPath, originalPath, row.id);
+      });
+
+      tileBtn.appendChild(img);
+      li.appendChild(tileBtn);
+      list.appendChild(li);
+    });
+    return;
+  }
 
   state.images.forEach((row) => {
     const li = document.createElement('li');
@@ -1819,6 +1882,17 @@ if (toggleMetadataEl) {
   });
 }
 
+if (toggleYourLayoutEl) {
+  toggleYourLayoutEl.addEventListener('click', () => {
+    if (state.yourLayout === 'list') state.yourLayout = 'tile';
+    else if (state.yourLayout === 'tile') state.yourLayout = 'masonry';
+    else state.yourLayout = 'list';
+    window.localStorage.setItem(YOUR_LAYOUT_KEY, state.yourLayout);
+    syncYourLayoutUI();
+    renderImageList();
+  });
+}
+
 if (toggleMetadataSharedEl) {
   toggleMetadataSharedEl.addEventListener('click', () => {
     state.showSharedCaptions = !state.showSharedCaptions;
@@ -2104,6 +2178,7 @@ applyLanguage();
 syncLoginPasswordToggle();
 syncSharedLayoutUI();
 syncSharedCaptionToggleUI();
+syncYourLayoutUI();
 refreshImages().catch(() => {});
 renderPreviews();
 syncUseEnhancedButton();
