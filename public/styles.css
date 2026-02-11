@@ -109,6 +109,16 @@ body {
 .panel-head h2 {
   margin: 0;
 }
+.section-count {
+  font-size: 12px;
+  color: #4f6472;
+  border: 1px solid #d4e1e8;
+  background: #f7fbff;
+  border-radius: 999px;
+  padding: 4px 10px;
+  line-height: 1.1;
+  white-space: nowrap;
+}
 
 .icon-btn {
   width: 36px;
@@ -501,8 +511,8 @@ button.ghost.danger:hover {
   overflow-wrap: anywhere;
 }
 .image-icon {
-  width: 52px;
-  height: 52px;
+  width: 68px;
+  height: 68px;
   border: 1px solid #bdd0db;
   border-radius: 7px;
   display: inline-flex;
@@ -510,8 +520,9 @@ button.ghost.danger:hover {
   justify-content: center;
   background: #f3f9fc;
   flex: 0 0 auto;
-  padding: 0;
+  padding: 0 !important;
   cursor: pointer;
+  box-shadow: 0 8px 20px rgba(20, 55, 74, 0.18);
 }
 
 button.image-icon {

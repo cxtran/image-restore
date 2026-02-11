@@ -53,8 +53,9 @@ const i18n = {
     uploadImage: 'Upload Image',
     caption: 'Caption',
     captionPlaceholder: 'Image caption (optional)',
-    showMetadata: 'Show Metadata',
-    hideMetadata: 'Hide Metadata',
+    showMetadata: 'Show Image Info',
+    hideMetadata: 'Hide Image Info',
+    totalImages: 'Total Images: {count}',
     yourImages: 'Your Images',
     sharedImages: 'Shared Images',
     refreshLibrary: 'Refresh Library',
@@ -173,8 +174,9 @@ const i18n = {
     logout: 'Đăng xuất',
     uploadImage: 'Tải ảnh lên',
     caption: 'Chú thích',
-    showMetadata: 'Hiển thị thông tin',
-    hideMetadata: 'Giấu thông tin',
+    showMetadata: 'Hiển thị thông tin ảnh',
+    hideMetadata: 'Giấu thông tin ảnh',
+    totalImages: 'Tổng số ảnh: {count}',
     sharedImages: 'Ảnh chia sẻ',
     yourImages: 'Ảnh của bạn',
     refreshLibrary: 'Làm mới thư viện',
@@ -363,6 +365,8 @@ const filePickerBtnEl = document.getElementById('filePickerBtn');
 const filePickerNameEl = document.getElementById('filePickerName');
 const toggleMetadataEl = document.getElementById('toggleMetadata');
 const toggleMetadataSharedEl = document.getElementById('toggleMetadataShared');
+const yourImagesCountEl = document.getElementById('yourImagesCount');
+const sharedImagesCountEl = document.getElementById('sharedImagesCount');
 const loginPasswordInputEl = document.getElementById('password');
 const loginPasswordToggleEl = document.getElementById('toggleLoginPassword');
 const languageLabelEl = document.getElementById('languageLabel');
@@ -484,6 +488,15 @@ function syncLoginPasswordToggle() {
   loginPasswordToggleEl.setAttribute('aria-pressed', showing ? 'true' : 'false');
 }
 
+function syncImageCounts() {
+  if (yourImagesCountEl) {
+    yourImagesCountEl.textContent = t('totalImages', { count: state.images.length });
+  }
+  if (sharedImagesCountEl) {
+    sharedImagesCountEl.textContent = t('totalImages', { count: state.sharedImages.length });
+  }
+}
+
 function applyLanguage() {
   document.documentElement.lang = currentLang === 'vi' ? 'vi' : 'en';
   document.title = t('title');
@@ -598,6 +611,7 @@ function applyLanguage() {
   updateSliderLabels();
   updatePreviewSizeLabels();
   syncMetadataToggleButtons();
+  syncImageCounts();
   renderImageList();
   renderSharedImageList();
   if (state.currentUser && state.currentUser.email) {
@@ -1283,6 +1297,7 @@ async function deleteAllEnhancedVersions(imageId) {
 function renderImageList() {
   const list = document.getElementById('images');
   list.innerHTML = '';
+  syncImageCounts();
 
   state.images.forEach((row) => {
     const li = document.createElement('li');
@@ -1427,6 +1442,7 @@ function renderSharedImageList() {
   const list = document.getElementById('sharedImages');
   if (!list) return;
   list.innerHTML = '';
+  syncImageCounts();
 
   state.sharedImages.forEach((row) => {
     const li = document.createElement('li');
