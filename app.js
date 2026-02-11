@@ -25,7 +25,11 @@ const PORT = process.env.PORT || 4011;
 app.set('io', io);
 const publicDir = path.join(__dirname, 'public');
 const indexTemplatePath = path.join(publicDir, 'index.html');
+const loginTemplatePath = path.join(publicDir, 'login.html');
 const adminTemplatePath = path.join(publicDir, 'admin.html');
+const yourImagesTemplatePath = path.join(publicDir, 'your-images.html');
+const sharedImagesTemplatePath = path.join(publicDir, 'shared-images.html');
+const slideshowTemplatePath = path.join(publicDir, 'slideshow.html');
 
 ['./uploads', './data'].forEach((dir) => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -44,7 +48,17 @@ app.use((req, res, next) => {
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 function getAssetVersion() {
-  const files = ['index.html', 'app.js', 'styles.css'];
+  const files = [
+    'index.html',
+    'login.html',
+    'your-images.html',
+    'shared-images.html',
+    'slideshow.html',
+    'app.js',
+    'login.js',
+    'slideshow.js',
+    'styles.css'
+  ];
   const latestMs = files.reduce((max, file) => {
     try {
       const stat = fs.statSync(path.join(publicDir, file));
@@ -56,24 +70,29 @@ function getAssetVersion() {
   return latestMs || Date.now();
 }
 
-function serveIndexWithVersion(_req, res) {
-  fs.readFile(indexTemplatePath, 'utf8', (err, html) => {
-    if (err) return res.status(500).send('Failed to load UI');
-    const version = String(getAssetVersion());
-    return res.type('html').send(html.replaceAll('__ASSET_VERSION__', version));
-  });
+function serveTemplateWithVersion(templatePath, errorMessage) {
+  return (_req, res) => {
+    fs.readFile(templatePath, 'utf8', (err, html) => {
+      if (err) return res.status(500).send(errorMessage);
+      const version = String(getAssetVersion());
+      return res.type('html').send(html.replaceAll('__ASSET_VERSION__', version));
+    });
+  };
 }
 
-function serveAdminWithVersion(_req, res) {
-  fs.readFile(adminTemplatePath, 'utf8', (err, html) => {
-    if (err) return res.status(500).send('Failed to load admin UI');
-    const version = String(getAssetVersion());
-    return res.type('html').send(html.replaceAll('__ASSET_VERSION__', version));
-  });
-}
+const serveIndexWithVersion = serveTemplateWithVersion(indexTemplatePath, 'Failed to load UI');
+const serveLoginWithVersion = serveTemplateWithVersion(loginTemplatePath, 'Failed to load login UI');
+const serveAdminWithVersion = serveTemplateWithVersion(adminTemplatePath, 'Failed to load admin UI');
+const serveYourImagesWithVersion = serveTemplateWithVersion(yourImagesTemplatePath, 'Failed to load your images UI');
+const serveSharedImagesWithVersion = serveTemplateWithVersion(sharedImagesTemplatePath, 'Failed to load shared images UI');
+const serveSlideshowWithVersion = serveTemplateWithVersion(slideshowTemplatePath, 'Failed to load slideshow UI');
 
-app.get('/', serveIndexWithVersion);
+app.get('/', serveLoginWithVersion);
+app.get('/login.html', serveLoginWithVersion);
 app.get('/index.html', serveIndexWithVersion);
+app.get('/your-images.html', serveYourImagesWithVersion);
+app.get('/shared-images.html', serveSharedImagesWithVersion);
+app.get('/slideshow.html', serveSlideshowWithVersion);
 app.get('/admin.html', serveAdminWithVersion);
 app.use(express.static(publicDir));
 

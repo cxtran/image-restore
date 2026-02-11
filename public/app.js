@@ -350,6 +350,7 @@ const registerBtnEl = document.getElementById('register');
 const authMessageEl = document.getElementById('authMessage');
 const accountLabelEl = document.getElementById('accountLabel');
 const adminLinkEl = document.getElementById('adminLink');
+const heroUserEl = document.getElementById('heroUser');
 const authOnlyEls = Array.from(document.querySelectorAll('.auth-only'));
 const beforeSizeEl = document.getElementById('beforeSize');
 const afterSizeEl = document.getElementById('afterSize');
@@ -686,7 +687,16 @@ function applyLanguage() {
   renderImageList();
   renderSharedImageList();
   if (state.currentUser && state.currentUser.email) {
-    accountLabelEl.textContent = t('signedInAs', { email: state.currentUser.email });
+    if (accountLabelEl) {
+      accountLabelEl.textContent = t('signedInAs', { email: state.currentUser.email });
+    }
+    if (heroUserEl) {
+      heroUserEl.textContent = t('signedInAs', { email: state.currentUser.email });
+      heroUserEl.hidden = false;
+    }
+  } else if (heroUserEl) {
+    heroUserEl.textContent = '';
+    heroUserEl.hidden = true;
   }
 }
 
@@ -856,16 +866,22 @@ function setAuthUI(user) {
   const role = (user && user.role) ? String(user.role).toLowerCase() : 'user';
   forcePasswordRequired = Boolean(user && user.force_password_change);
   state.currentUser = loggedIn ? user : null;
-  authGuestEl.hidden = loggedIn;
-  authUserEl.hidden = !loggedIn;
+  if (authGuestEl) authGuestEl.hidden = loggedIn;
+  if (authUserEl) authUserEl.hidden = !loggedIn;
   if (registerBtnEl) registerBtnEl.hidden = loggedIn;
   if (authMessageEl) {
     authMessageEl.hidden = loggedIn;
     if (loggedIn) authMessageEl.textContent = '';
   }
-  authGuestEl.style.display = loggedIn ? 'none' : 'grid';
-  authUserEl.style.display = loggedIn ? 'flex' : 'none';
-  accountLabelEl.textContent = loggedIn ? t('signedInAs', { email: user.email }) : '';
+  if (authGuestEl) authGuestEl.style.display = loggedIn ? 'none' : 'grid';
+  if (authUserEl) authUserEl.style.display = loggedIn ? 'flex' : 'none';
+  if (accountLabelEl) {
+    accountLabelEl.textContent = loggedIn ? t('signedInAs', { email: user.email }) : '';
+  }
+  if (heroUserEl) {
+    heroUserEl.textContent = loggedIn ? t('signedInAs', { email: user.email }) : '';
+    heroUserEl.hidden = !loggedIn;
+  }
   if (adminLinkEl) adminLinkEl.hidden = !(loggedIn && role === 'admin');
   authOnlyEls.forEach((el) => {
     el.hidden = !loggedIn || forcePasswordRequired;
@@ -1600,88 +1616,106 @@ function renderSharedImageList() {
   });
 }
 
-document.getElementById('register').onclick = async () => {
-  openRegisterModal();
-};
+const registerBtnInlineEl = document.getElementById('register');
+if (registerBtnInlineEl) {
+  registerBtnInlineEl.onclick = async () => {
+    openRegisterModal();
+  };
+}
 
-registerSubmitEl.onclick = async () => {
-  try {
-    const email = registerEmailEl.value.trim();
-    const password = registerPasswordEl.value;
-    const confirmPassword = registerPasswordConfirmEl.value;
-    if (!email) throw new Error(t('emailRequired'));
-    if (password.length < 8) throw new Error(t('passwordMin'));
-    if (password !== confirmPassword) throw new Error(t('passwordConfirmMismatch'));
+if (registerSubmitEl) {
+  registerSubmitEl.onclick = async () => {
+    try {
+      const email = registerEmailEl.value.trim();
+      const password = registerPasswordEl.value;
+      const confirmPassword = registerPasswordConfirmEl.value;
+      if (!email) throw new Error(t('emailRequired'));
+      if (password.length < 8) throw new Error(t('passwordMin'));
+      if (password !== confirmPassword) throw new Error(t('passwordConfirmMismatch'));
 
-    const data = await api('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
-    });
-    log(t('registered', { email: data.email }), { popup: true });
-    document.getElementById('email').value = '';
-    document.getElementById('password').value = '';
-    closeRegisterModal();
-    window.setTimeout(() => {
-      window.location.reload();
-    }, 250);
-  } catch (e) {
-    registerMessageEl.textContent = e.message || t('registerFailed');
-    registerMessageEl.hidden = false;
-  }
-};
-registerCancelEl.onclick = closeRegisterModal;
-
-document.getElementById('login').onclick = async () => {
-  try {
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
-    const data = await api('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
-    });
-    setAuthUI(data.user || { email });
-    if (!Boolean(data.user?.force_password_change)) {
-      await refreshImages();
+      const data = await api('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      log(t('registered', { email: data.email }), { popup: true });
+      const emailInputEl = document.getElementById('email');
+      const passwordInputEl = document.getElementById('password');
+      if (emailInputEl) emailInputEl.value = '';
+      if (passwordInputEl) passwordInputEl.value = '';
+      closeRegisterModal();
+      window.setTimeout(() => {
+        window.location.reload();
+      }, 250);
+    } catch (e) {
+      registerMessageEl.textContent = e.message || t('registerFailed');
+      registerMessageEl.hidden = false;
     }
-    if (authMessageEl) {
-      authMessageEl.textContent = '';
-      authMessageEl.hidden = true;
-    }
-    log(t('loggedIn'));
-  } catch (e) {
-    if (authMessageEl) {
-      authMessageEl.textContent = e.message || t('loginFailed');
-      authMessageEl.hidden = false;
-    }
-    log(e.message);
-  }
-};
+  };
+}
+if (registerCancelEl) registerCancelEl.onclick = closeRegisterModal;
 
-document.getElementById('logout').onclick = async () => {
-  try {
-    await api('/api/auth/logout', { method: 'POST' });
-    document.getElementById('email').value = '';
-    document.getElementById('password').value = '';
-    setAuthUI(null);
-    state.images = [];
-    state.sharedImages = [];
-    state.selectedImageId = null;
-    state.uploadedPreviewUrl = '';
-    state.completedPreviewUrl = '';
-    state.beforeBytes = null;
-    state.afterBytes = null;
-    state.pendingEnhancedPath = '';
-    forcePasswordRequired = false;
-    renderImageList();
-    renderSharedImageList();
-    renderPreviews();
-    log(t('loggedOut'));
-  } catch (e) {
-    log(e.message);
-  }
-};
+const loginBtnInlineEl = document.getElementById('login');
+if (loginBtnInlineEl) {
+  loginBtnInlineEl.onclick = async () => {
+    try {
+      const emailInputEl = document.getElementById('email');
+      const passwordInputEl = document.getElementById('password');
+      const email = emailInputEl ? emailInputEl.value : '';
+      const password = passwordInputEl ? passwordInputEl.value : '';
+      const data = await api('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      setAuthUI(data.user || { email });
+      if (!Boolean(data.user?.force_password_change)) {
+        await refreshImages();
+      }
+      if (authMessageEl) {
+        authMessageEl.textContent = '';
+        authMessageEl.hidden = true;
+      }
+      log(t('loggedIn'));
+    } catch (e) {
+      if (authMessageEl) {
+        authMessageEl.textContent = e.message || t('loginFailed');
+        authMessageEl.hidden = false;
+      }
+      log(e.message);
+    }
+  };
+}
+
+const logoutBtnInlineEl = document.getElementById('logout');
+if (logoutBtnInlineEl) {
+  logoutBtnInlineEl.onclick = async () => {
+    try {
+      await api('/api/auth/logout', { method: 'POST' });
+      const emailInputEl = document.getElementById('email');
+      const passwordInputEl = document.getElementById('password');
+      if (emailInputEl) emailInputEl.value = '';
+      if (passwordInputEl) passwordInputEl.value = '';
+      setAuthUI(null);
+      state.images = [];
+      state.sharedImages = [];
+      state.selectedImageId = null;
+      state.uploadedPreviewUrl = '';
+      state.completedPreviewUrl = '';
+      state.beforeBytes = null;
+      state.afterBytes = null;
+      state.pendingEnhancedPath = '';
+      forcePasswordRequired = false;
+      renderImageList();
+      renderSharedImageList();
+      renderPreviews();
+      log(t('loggedOut'));
+      window.location.href = '/login.html';
+    } catch (e) {
+      log(e.message);
+    }
+  };
+}
 
 async function uploadPendingOrSelectedFile(caption = '') {
   const file = pendingUploadFile || photoInputEl.files[0];
@@ -2197,7 +2231,11 @@ api('/api/auth/me')
       await refreshImages();
     }
   })
-  .catch(() => {});
+  .catch(() => {
+    const nextPath = `${window.location.pathname}${window.location.search || ''}`;
+    const encoded = encodeURIComponent(nextPath);
+    window.location.href = `/login.html?next=${encoded}`;
+  });
 
 if (socket) {
   socket.on('socket-ready', (payload) => {
@@ -2275,7 +2313,11 @@ if (forcePasswordSubmitEl) {
 }
 if (forcePasswordLogoutEl) {
   forcePasswordLogoutEl.addEventListener('click', () => {
-    document.getElementById('logout').click();
+    if (logoutBtnInlineEl) {
+      logoutBtnInlineEl.click();
+      return;
+    }
+    window.location.href = '/login.html';
   });
 }
 

@@ -26,7 +26,6 @@ const i18n = {
     administration: 'Administration',
     adminHeroSubtitle: 'Manage users, roles, and all images on the server.',
     adminAccount: 'Admin Account',
-    backToApp: 'Back to App',
     checkingAdmin: 'Checking admin access...',
     addUser: 'Add User',
     email: 'Email',
@@ -70,7 +69,6 @@ const i18n = {
     administration: 'Quản trị',
     adminHeroSubtitle: 'Quản lý người dùng, vai trò và toàn bộ ảnh trên máy chủ.',
     adminAccount: 'Tài khoản quản trị',
-    backToApp: 'Về ứng dụng',
     checkingAdmin: 'Đang kiểm tra quyền quản trị...',
     addUser: 'Thêm người dùng',
     email: 'Email',
@@ -174,7 +172,6 @@ function applyLanguage() {
   setText('adminHeroTitle', 'administration');
   setText('adminHeroSubtitle', 'adminHeroSubtitle');
   setText('adminAccountTitle', 'adminAccount');
-  setText('backToApp', 'backToApp');
   setText('addUserTitle', 'addUser');
   setText('createUserBtn', 'createUser');
   setText('usersTitle', 'users');
@@ -349,9 +346,6 @@ async function ensureAdmin() {
   return true;
 }
 
-document.getElementById('backToApp').addEventListener('click', () => {
-  window.location.href = '/';
-});
 
 document.getElementById('createUserBtn').addEventListener('click', async () => {
   try {
