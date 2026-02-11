@@ -1,11 +1,14 @@
 const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
+const sharp = require('sharp');
 const db = require('../db');
 const { processImagePipeline } = require('../services/processingService');
 
 const uploadDir = path.resolve(process.env.UPLOAD_DIR || './uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+const iconDir = path.join(uploadDir, 'icons');
+if (!fs.existsSync(iconDir)) fs.mkdirSync(iconDir, { recursive: true });
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, uploadDir),
@@ -21,7 +24,7 @@ exports.uploadMiddleware = upload.single('photo');
 
 function getFileSizeBytesFromRelPath(relPath) {
   try {
-    const abs = path.resolve('.', String(relPath || '').replace(/^\//, ''));
+    const abs = relPathToAbs(relPath);
     if (!fs.existsSync(abs)) return null;
     return fs.statSync(abs).size;
   } catch (_error) {
@@ -29,31 +32,100 @@ function getFileSizeBytesFromRelPath(relPath) {
   }
 }
 
-function relPathToAbs(relPath) {
-  return path.resolve('.', String(relPath || '').replace(/^\//, ''));
+function normalizeRelPath(relPath) {
+  return String(relPath || '').trim().replace(/\\/g, '/');
 }
 
-function deleteFilesIfPresent(paths = []) {
+function relPathToAbs(relPath) {
+  const normalizedRaw = normalizeRelPath(relPath);
+  const normalized = normalizedRaw.replace(/^\/+/, '');
+
+  // Prefer resolving logical "/uploads/..." paths against the configured upload directory.
+  if (normalizedRaw.startsWith('/uploads/')) {
+    return path.join(uploadDir, normalizedRaw.slice('/uploads/'.length));
+  }
+  if (normalized.startsWith('uploads/')) {
+    return path.join(uploadDir, normalized.slice('uploads/'.length));
+  }
+
+  if (path.isAbsolute(normalizedRaw)) {
+    return path.normalize(normalizedRaw);
+  }
+  return path.resolve('.', normalized);
+}
+
+function delay(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+async function unlinkWithRetry(absPath, maxRetries = 6, waitMs = 120) {
+  let attempt = 0;
+  while (attempt <= maxRetries) {
+    try {
+      await fs.promises.unlink(absPath);
+      return null;
+    } catch (error) {
+      const code = String(error?.code || '');
+      const retryable = code === 'EPERM' || code === 'EBUSY' || code === 'EACCES';
+      if (!retryable || attempt === maxRetries) return error;
+      attempt += 1;
+      await delay(waitMs * attempt);
+    }
+  }
+  return null;
+}
+
+async function deleteFilesIfPresent(paths = []) {
   const failed = [];
   const deleted = [];
   const uniquePaths = Array.from(new Set(paths.filter(Boolean)));
-  uniquePaths.forEach((relPath) => {
-    if (!relPath) return;
-    const absPath = relPathToAbs(relPath);
+  for (const relPath of uniquePaths) {
+    if (!relPath) continue;
+    const normalizedRel = normalizeRelPath(relPath);
+    let absPath = relPathToAbs(normalizedRel);
     const uploadRoot = uploadDir.endsWith(path.sep) ? uploadDir : `${uploadDir}${path.sep}`;
     if (!(absPath === uploadDir || absPath.startsWith(uploadRoot))) {
       failed.push({ path: relPath, error: 'Path is outside upload directory' });
-      return;
+      continue;
     }
-    if (!fs.existsSync(absPath)) return;
-    try {
-      fs.unlinkSync(absPath);
+    if (!fs.existsSync(absPath)) {
+      // Fallback for legacy/mismatched stored path formats: try basename under uploadDir.
+      const baseName = path.basename(normalizedRel);
+      if (!baseName || baseName === '.' || baseName === '..') continue;
+      const fallbackAbs = path.join(uploadDir, baseName);
+      if (!(fallbackAbs === uploadDir || fallbackAbs.startsWith(uploadRoot))) continue;
+      if (!fs.existsSync(fallbackAbs)) continue;
+      absPath = fallbackAbs;
+    }
+    const unlinkError = await unlinkWithRetry(absPath);
+    if (!unlinkError) {
       deleted.push(relPath);
-    } catch (error) {
-      failed.push({ path: relPath, error: error.message });
+    } else {
+      failed.push({ path: relPath, error: unlinkError.message });
     }
-  });
+  }
   return { deleted, failed };
+}
+
+async function createImageIconFromRelPath(imageId, sourceRelPath) {
+  if (!imageId || !sourceRelPath) return '';
+  const sourceAbs = relPathToAbs(sourceRelPath);
+  if (!fs.existsSync(sourceAbs)) return '';
+  const iconFileName = `${Number(imageId)}-icon.jpg`;
+  const iconAbs = path.join(iconDir, iconFileName);
+  try {
+    const sourceBuffer = await fs.promises.readFile(sourceAbs);
+    await sharp(sourceBuffer)
+      .rotate()
+      .resize(160, 160, { fit: 'cover', position: 'center' })
+      .jpeg({ quality: 78, mozjpeg: true })
+      .toFile(iconAbs);
+    return `/uploads/icons/${iconFileName}`;
+  } catch (_error) {
+    return '';
+  }
 }
 
 exports.uploadPhoto = async (req, res) => {
@@ -66,6 +138,10 @@ exports.uploadPhoto = async (req, res) => {
       'INSERT INTO images (user_id, original_name, caption, original_path, current_path) VALUES (?, ?, ?, ?, ?)',
       [req.user.id, req.file.originalname, caption, relPath, relPath]
     );
+    const iconPath = await createImageIconFromRelPath(result.insertId, relPath);
+    if (iconPath) {
+      await db.query('UPDATE images SET icon_path = ? WHERE id = ?', [iconPath, result.insertId]);
+    }
 
     await db.query(
       'INSERT INTO image_versions (image_id, version_num, file_path, operations_json) VALUES (?, 1, ?, ?)',
@@ -92,12 +168,15 @@ exports.replaceOriginalImage = async (req, res) => {
     const shouldUpdateCurrentPath = String(image.current_path || '') === String(oldOriginalPath || '');
     const hasCaption = Object.prototype.hasOwnProperty.call(req.body || {}, 'caption');
     const nextCaption = hasCaption ? String(req.body?.caption || '').trim().slice(0, 1000) : null;
+    const nextIconPath = await createImageIconFromRelPath(imageId, newOriginalPath);
+    const hasIcon = Boolean(nextIconPath);
 
     await db.query(
       `UPDATE images
        SET original_path = ?,
            current_path = IF(? = 1, ?, current_path),
-           caption = IF(? = 1, ?, caption)
+           caption = IF(? = 1, ?, caption),
+           icon_path = IF(? = 1, ?, icon_path)
        WHERE id = ?`,
       [
       newOriginalPath,
@@ -105,6 +184,8 @@ exports.replaceOriginalImage = async (req, res) => {
       newOriginalPath,
       hasCaption ? 1 : 0,
       nextCaption,
+      hasIcon ? 1 : 0,
+      nextIconPath,
       imageId
       ]
     );
@@ -120,7 +201,7 @@ exports.replaceOriginalImage = async (req, res) => {
     );
     const stillReferencedByCurrent = String(image.current_path || '') === String(oldOriginalPath || '') && !shouldUpdateCurrentPath;
     if (oldOriginalPath && Number(usage[0]?.c || 0) === 0 && !stillReferencedByCurrent) {
-      deleteFilesIfPresent([oldOriginalPath]);
+      await deleteFilesIfPresent([oldOriginalPath]);
     }
 
     return res.json({ message: 'Original image updated', imageId, original_path: newOriginalPath });
@@ -132,7 +213,7 @@ exports.replaceOriginalImage = async (req, res) => {
 exports.listMyImages = async (req, res) => {
   try {
     const [rows] = await db.query(
-      `SELECT i.id, i.original_name, i.caption, i.original_path, i.current_path, i.created_at, i.updated_at,
+      `SELECT i.id, i.original_name, i.caption, i.icon_path, i.original_path, i.current_path, i.created_at, i.updated_at,
               v.version_num, v.file_path, v.is_shared AS version_is_shared, v.created_at AS version_created_at
        FROM images i
        LEFT JOIN image_versions v ON v.image_id = i.id
@@ -148,6 +229,7 @@ exports.listMyImages = async (req, res) => {
           id: row.id,
           original_name: row.original_name,
           caption: row.caption || '',
+          icon_path: row.icon_path || '',
           original_path: row.original_path,
           current_path: row.current_path,
           created_at: row.created_at,
@@ -183,7 +265,7 @@ exports.listMyImages = async (req, res) => {
 exports.listSharedImages = async (req, res) => {
   try {
     const [rows] = await db.query(
-      `SELECT i.id, i.user_id, u.email AS owner_email, i.original_name, i.caption, i.original_path, i.current_path, i.created_at, i.updated_at,
+      `SELECT i.id, i.user_id, u.email AS owner_email, i.original_name, i.caption, i.icon_path, i.original_path, i.current_path, i.created_at, i.updated_at,
               v.version_num, v.file_path, v.is_shared AS version_is_shared, v.created_at AS version_created_at
        FROM images i
        INNER JOIN users u ON u.id = i.user_id
@@ -201,6 +283,7 @@ exports.listSharedImages = async (req, res) => {
           owner_email: row.owner_email,
           original_name: row.original_name,
           caption: row.caption || '',
+          icon_path: row.icon_path || '',
           original_path: row.original_path,
           current_path: row.current_path,
           created_at: row.created_at,
@@ -305,7 +388,7 @@ exports.processImage = async (req, res) => {
     // Default to original image as enhancement input so toggles reflect a clean source.
     const useCurrentInput = options.use_current_input === true || String(options.use_current_input).toLowerCase() === 'true';
     const sourceRelPath = useCurrentInput ? image.current_path : (image.original_path || image.current_path);
-    const srcFile = path.resolve('.', String(sourceRelPath || '').replace(/^\//, ''));
+    const srcFile = relPathToAbs(sourceRelPath);
     const outFileName = `${imageId}-preview-${Date.now()}.jpg`;
     const outFile = path.join(uploadDir, outFileName);
     const outRel = `/uploads/${outFileName}`;
@@ -382,7 +465,7 @@ exports.acceptEnhancedImage = async (req, res) => {
     const image = rows[0];
     if (!image) return res.status(404).json({ message: 'Image not found' });
 
-    const absPreview = path.resolve('.', previewPath.replace(/^\//, ''));
+    const absPreview = relPathToAbs(previewPath);
     if (!fs.existsSync(absPreview)) {
       return res.status(404).json({ message: 'Preview file not found on disk' });
     }
@@ -418,7 +501,7 @@ exports.downloadImage = async (req, res) => {
       targetPath = vrows[0].file_path;
     }
 
-    const abs = path.resolve('.', targetPath.replace(/^\//, ''));
+    const abs = relPathToAbs(targetPath);
     if (!fs.existsSync(abs)) return res.status(404).json({ message: 'File missing on disk' });
 
     return res.download(abs, `restored-${image.original_name}`);
@@ -438,11 +521,12 @@ exports.deleteImage = async (req, res) => {
     const [versions] = await db.query('SELECT file_path FROM image_versions WHERE image_id = ?', [imageId]);
 
     const pathsToDelete = new Set();
+    pathsToDelete.add(image.icon_path);
     pathsToDelete.add(image.original_path);
     pathsToDelete.add(image.current_path);
     versions.forEach((v) => pathsToDelete.add(v.file_path));
 
-    const cleanup = deleteFilesIfPresent(Array.from(pathsToDelete));
+    const cleanup = await deleteFilesIfPresent(Array.from(pathsToDelete));
     if (cleanup.failed.length) {
       return res.status(500).json({
         message: 'Image files could not be deleted from server',
@@ -500,7 +584,7 @@ exports.deleteEnhancedVersions = async (req, res) => {
     const candidateDeletePaths = toDelete
       .map((v) => v.file_path)
       .filter((p) => p && !protectedPaths.has(p));
-    deleteFilesIfPresent(candidateDeletePaths);
+    await deleteFilesIfPresent(candidateDeletePaths);
 
     return res.json({
       message: `Deleted ${toDelete.length} enhanced version(s)`,
@@ -532,7 +616,7 @@ exports.deleteAllEnhancedVersions = async (req, res) => {
     const pathsToDelete = enhanced
       .map((v) => v.file_path)
       .filter((p) => p && p !== image.original_path);
-    deleteFilesIfPresent(pathsToDelete);
+    await deleteFilesIfPresent(pathsToDelete);
 
     return res.json({
       message: enhanced.length ? `Deleted ${enhanced.length} enhanced version(s)` : 'No enhanced versions to delete',

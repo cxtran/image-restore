@@ -1313,7 +1313,7 @@ function renderImageList() {
     icon.setAttribute('aria-label', `${t('view')}: ${row.original_name || `image-${row.id}`}`);
     const iconImg = document.createElement('img');
     iconImg.alt = row.original_name || `image-${row.id}`;
-    iconImg.src = row.original_path || row.current_path || '';
+    iconImg.src = row.icon_path || row.original_path || row.current_path || '';
     iconImg.loading = 'lazy';
     iconImg.onerror = () => {
       icon.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM7 9a2 2 0 1 0 0.001 0zM6 17h12l-4-5-3 4-2-2z"/></svg>';
@@ -1458,7 +1458,7 @@ function renderSharedImageList() {
     icon.setAttribute('aria-label', `${t('view')}: ${row.original_name || `image-${row.id}`}`);
     const iconImg = document.createElement('img');
     iconImg.alt = row.original_name || `image-${row.id}`;
-    iconImg.src = row.original_path || row.current_path || '';
+    iconImg.src = row.icon_path || row.original_path || row.current_path || '';
     iconImg.loading = 'lazy';
     iconImg.onerror = () => {
       icon.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM7 9a2 2 0 1 0 0.001 0zM6 17h12l-4-5-3 4-2-2z"/></svg>';

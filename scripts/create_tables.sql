@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS images (
   user_id INT NOT NULL,
   original_name VARCHAR(255) NOT NULL,
   caption TEXT NULL,
+  icon_path TEXT NULL,
   original_path TEXT NOT NULL,
   current_path TEXT NOT NULL,
   is_shared TINYINT(1) NOT NULL DEFAULT 0,
@@ -44,6 +45,8 @@ ALTER TABLE images
   ADD COLUMN IF NOT EXISTS is_shared TINYINT(1) NOT NULL DEFAULT 0;
 ALTER TABLE images
   ADD COLUMN IF NOT EXISTS caption TEXT NULL;
+ALTER TABLE images
+  ADD COLUMN IF NOT EXISTS icon_path TEXT NULL;
 
 CREATE TABLE IF NOT EXISTS image_versions (
   id INT AUTO_INCREMENT PRIMARY KEY,
