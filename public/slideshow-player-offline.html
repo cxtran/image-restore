@@ -1,0 +1,79 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Image Restore Studio - Slideshow Offline Player</title>
+    <link rel="stylesheet" href="/styles.css?v=__ASSET_VERSION__" />
+  </head>
+  <body class="slideshow-player-body">
+    <script>
+      window.OFFLINE_SLIDESHOW_DATA = null;
+      /* __OFFLINE_SLIDESHOW_DATA__ */
+    </script>
+
+    <div id="playerToolbar" class="player-toolbar">
+      <span id="playerName" class="player-name">Offline Slideshow</span>
+      <button id="togglePlay" type="button">Pause</button>
+      <button id="prevSlide" class="ghost" type="button">Prev</button>
+      <button id="nextSlide" class="ghost" type="button">Next</button>
+      <label>Speed
+        <input id="speedInput" type="number" min="1" max="30" step="1" value="5" />
+      </label>
+      <label>Effect
+        <select id="effectInput">
+          <option value="fade">Fade</option>
+          <option value="zoom">Zoom</option>
+          <option value="slide">Slide</option>
+        </select>
+      </label>
+      <label>Layout
+        <select id="layoutInput">
+          <option value="single">Single</option>
+          <option value="title">Title</option>
+          <option value="mansory">Mansory</option>
+        </select>
+      </label>
+      <label>Theme
+        <select id="themeInput">
+          <option value="default">Default</option>
+          <option value="vintage">Vintage</option>
+          <option value="noir">Noir</option>
+          <option value="black">Black</option>
+          <option value="warm">Warm</option>
+          <option value="ocean">Ocean</option>
+        </select>
+      </label>
+      <label id="titleRowsWrap" hidden>Rows
+        <input id="titleRowsInput" type="number" min="1" max="6" step="1" value="2" />
+      </label>
+      <label id="titleColsWrap" hidden>Columns
+        <input id="titleColsInput" type="number" min="1" max="8" step="1" value="3" />
+      </label>
+      <label id="mansorySizeWrap" hidden>Image Size
+        <select id="mansorySizeModeInput">
+          <option value="auto">Auto</option>
+          <option value="custom">Custom</option>
+        </select>
+        <input id="mansorySizeInput" type="number" min="120" max="520" step="10" value="220" />
+      </label>
+      <button id="musicToggle" class="ghost" type="button">Music Off</button>
+      <button id="fullscreenBtn" class="ghost" type="button">Fullscreen</button>
+      <button id="backBtn" class="ghost admin-link" type="button">Back</button>
+    </div>
+    <button id="toolbarToggleCollapse" class="player-toolbar-fab toolbar-toggle-collapse" type="button" aria-label="Collapse toolbar">&#9650;</button>
+    <button id="toolbarToggleExpand" class="player-toolbar-fab toolbar-toggle-expand" type="button" aria-label="Expand toolbar" hidden>&#9776;</button>
+
+    <main id="playerStage" class="player-stage">
+      <div class="player-media">
+        <img id="slideImage" class="player-image effect-fade" alt="slide" />
+        <div id="slideCaption" class="player-caption player-caption-overlay" hidden></div>
+      </div>
+      <div id="slideGrid" class="player-grid" hidden></div>
+      <div id="slideMeta" class="player-meta"></div>
+    </main>
+
+    <audio id="bgm" preload="auto"></audio>
+    <script src="/slideshow-player-offline.js?v=__ASSET_VERSION__"></script>
+  </body>
+</html>

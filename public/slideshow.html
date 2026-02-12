@@ -3,19 +3,20 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Image Restore Studio - Slide Show</title>
+    <title>Image Restore Studio - Slideshow Builder</title>
     <link rel="stylesheet" href="/styles.css?v=__ASSET_VERSION__" />
   </head>
   <body>
     <main class="app-shell">
       <header class="hero">
-        <h1>Image Restore Studio</h1>
-        <p>Shared Images Slide Show</p>
+        <h1 id="heroTitle">Image Restore Studio</h1>
+        <p id="heroSubtitle">Create and play rich slideshows from shared images.</p>
         <div class="hero-meta">
           <p id="heroUser" class="hero-user" hidden></p>
           <button id="heroLogout" class="ghost danger hero-logout" type="button" hidden>Logout</button>
         </div>
       </header>
+
       <nav class="section-nav">
         <a href="/your-images.html">Your Images</a>
         <a href="/shared-images.html">Shared Images</a>
@@ -23,19 +24,89 @@
         <a href="/admin.html">Admin</a>
       </nav>
 
-      <section class="panel slideshow-panel">
-        <div class="slideshow-frame">
-          <img id="slideImage" alt="Shared slide" />
+      <section class="panel">
+        <div class="panel-head">
+          <h2>All Slideshows</h2>
+          <div class="btn-row">
+            <button id="refreshPrivate" class="ghost subtle-btn" type="button">Refresh</button>
+            <button id="openCreateModal" type="button">Create Slideshow</button>
+          </div>
         </div>
-        <p id="slideMeta" class="slideshow-meta">Loading shared images...</p>
-        <div class="slideshow-controls">
-          <button id="prevSlide" class="ghost" type="button">Prev</button>
-          <button id="togglePlay" type="button">Pause</button>
-          <button id="nextSlide" class="ghost" type="button">Next</button>
-        </div>
+        <div id="privateList" class="private-list"></div>
       </section>
+
+      <div id="createSlideshowModal" class="notice-modal" hidden>
+        <div class="notice-dialog slideshow-modal-dialog">
+          <div class="panel-head">
+            <h2 id="modalTitle">Create Slideshow</h2>
+            <button id="closeCreateModal" class="ghost" type="button">Close</button>
+          </div>
+
+          <section class="panel">
+            <div class="slideshow-name-row">
+              <label for="slideshowName">Slideshow Name</label>
+              <input id="slideshowName" type="text" maxlength="120" placeholder="Enter slideshow name" />
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Music</h2>
+              <button id="refreshMusic" class="ghost subtle-btn" type="button">Refresh</button>
+            </div>
+            <div class="slideshow-music-upload">
+              <input id="musicUpload" type="file" accept=".mp3,.wav,.ogg,.m4a,.aac,audio/*" />
+              <button id="uploadMusic" type="button">Upload Music</button>
+            </div>
+            <div id="musicGrid" class="music-grid"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Available Photos</h2>
+              <select id="sourceMode" aria-label="Photo Source">
+                <option value="mine">My Library</option>
+                <option value="shared">Shared Images</option>
+              </select>
+              <select id="myAlbumFilter" aria-label="Album Filter" hidden>
+                <option value="all">All Albums</option>
+              </select>
+              <input id="searchShared" type="text" placeholder="Search by name, owner, caption..." />
+            </div>
+            <div id="availableGrid" class="slideshow-card-grid"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Selected Slides</h2>
+              <span id="selectedCount" class="section-count">Slides: 0</span>
+            </div>
+            <div id="selectedGrid" class="slideshow-card-grid"></div>
+            <div class="slideshow-controls">
+              <button id="savePrivate" type="button">Save</button>
+              <button id="playSlideshow" type="button">Play</button>
+              <button id="playOffline" class="ghost" type="button">Play Slideshow Offline</button>
+              <button id="downloadOffline" class="ghost" type="button">Download Offline HTML</button>
+              <button id="clearSlides" class="ghost danger" type="button">Clear</button>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <div id="deleteSlideshowModal" class="notice-modal" hidden>
+        <div class="notice-dialog">
+          <h3>Delete Slideshow</h3>
+          <p id="deleteSlideshowMessage">Are you sure you want to delete this slideshow?</p>
+          <div class="btn-row">
+            <button id="confirmDeleteSlideshow" class="danger" type="button">Delete</button>
+            <button id="cancelDeleteSlideshow" class="ghost" type="button">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <p id="builderStatus" class="status">Ready.</p>
     </main>
 
-    <script src="/slideshow.js?v=__ASSET_VERSION__"></script>
+    <script src="/slideshow-builder.js?v=__ASSET_VERSION__"></script>
   </body>
 </html>

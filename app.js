@@ -30,6 +30,8 @@ const adminTemplatePath = path.join(publicDir, 'admin.html');
 const yourImagesTemplatePath = path.join(publicDir, 'your-images.html');
 const sharedImagesTemplatePath = path.join(publicDir, 'shared-images.html');
 const slideshowTemplatePath = path.join(publicDir, 'slideshow.html');
+const slideshowPlayerTemplatePath = path.join(publicDir, 'slideshow-player.html');
+const slideshowPlayerOfflineTemplatePath = path.join(publicDir, 'slideshow-player-offline.html');
 
 ['./uploads', './data'].forEach((dir) => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -54,9 +56,14 @@ function getAssetVersion() {
     'your-images.html',
     'shared-images.html',
     'slideshow.html',
+    'slideshow-player.html',
+    'slideshow-player-offline.html',
     'app.js',
     'login.js',
     'slideshow.js',
+    'slideshow-builder.js',
+    'slideshow-player.js',
+    'slideshow-player-offline.js',
     'styles.css'
   ];
   const latestMs = files.reduce((max, file) => {
@@ -86,6 +93,8 @@ const serveAdminWithVersion = serveTemplateWithVersion(adminTemplatePath, 'Faile
 const serveYourImagesWithVersion = serveTemplateWithVersion(yourImagesTemplatePath, 'Failed to load your images UI');
 const serveSharedImagesWithVersion = serveTemplateWithVersion(sharedImagesTemplatePath, 'Failed to load shared images UI');
 const serveSlideshowWithVersion = serveTemplateWithVersion(slideshowTemplatePath, 'Failed to load slideshow UI');
+const serveSlideshowPlayerWithVersion = serveTemplateWithVersion(slideshowPlayerTemplatePath, 'Failed to load slideshow player UI');
+const serveSlideshowPlayerOfflineWithVersion = serveTemplateWithVersion(slideshowPlayerOfflineTemplatePath, 'Failed to load slideshow offline player UI');
 
 app.get('/', serveLoginWithVersion);
 app.get('/login.html', serveLoginWithVersion);
@@ -93,12 +102,15 @@ app.get('/index.html', serveIndexWithVersion);
 app.get('/your-images.html', serveYourImagesWithVersion);
 app.get('/shared-images.html', serveSharedImagesWithVersion);
 app.get('/slideshow.html', serveSlideshowWithVersion);
+app.get('/slideshow-player.html', serveSlideshowPlayerWithVersion);
+app.get('/slideshow-player-offline.html', serveSlideshowPlayerOfflineWithVersion);
 app.get('/admin.html', serveAdminWithVersion);
 app.use(express.static(publicDir));
 
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/images', require('./routes/images'));
 app.use('/api/admin', require('./routes/admin'));
+app.use('/api/slideshow', require('./routes/slideshow'));
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
@@ -169,6 +181,21 @@ async function ensureImageAlbumColumn() {
   }
 }
 
+async function ensurePrivateSlideshowsTable() {
+  await db.query(
+    `CREATE TABLE IF NOT EXISTS private_slideshows (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      name VARCHAR(120) NOT NULL,
+      config_json JSON NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_private_slideshows_user (user_id),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )`
+  );
+}
+
 async function bootstrap() {
   try {
     await ensureRoleColumn();
@@ -179,6 +206,7 @@ async function bootstrap() {
     await ensureImageVersionSharedColumn();
     await ensureAlbumsTable();
     await ensureImageAlbumColumn();
+    await ensurePrivateSlideshowsTable();
     server.listen(PORT, () => {
       console.log(`Image Restore Studio running on port ${PORT}`);
     });
