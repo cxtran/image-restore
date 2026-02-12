@@ -134,9 +134,26 @@ exports.uploadPhoto = async (req, res) => {
   try {
     const relPath = `/uploads/${req.file.filename}`;
     const caption = req.body?.caption ? String(req.body.caption).trim().slice(0, 1000) : null;
+    const rawAlbumId = req.body?.album_id;
+    const hasAlbumId = !(rawAlbumId === undefined || rawAlbumId === null || rawAlbumId === '');
+    let albumId = null;
+    if (hasAlbumId) {
+      const parsed = Number(rawAlbumId);
+      if (!Number.isInteger(parsed) || parsed < 1) {
+        return res.status(400).json({ message: 'Invalid album id' });
+      }
+      const [albumRows] = await db.query(
+        'SELECT id FROM albums WHERE id = ? AND user_id = ? LIMIT 1',
+        [parsed, req.user.id]
+      );
+      if (!albumRows[0]) {
+        return res.status(404).json({ message: 'Album not found' });
+      }
+      albumId = parsed;
+    }
     const [result] = await db.query(
-      'INSERT INTO images (user_id, original_name, caption, original_path, current_path) VALUES (?, ?, ?, ?, ?)',
-      [req.user.id, req.file.originalname, caption, relPath, relPath]
+      'INSERT INTO images (user_id, album_id, original_name, caption, original_path, current_path) VALUES (?, ?, ?, ?, ?, ?)',
+      [req.user.id, albumId, req.file.originalname, caption, relPath, relPath]
     );
     const iconPath = await createImageIconFromRelPath(result.insertId, relPath);
     if (iconPath) {
@@ -151,6 +168,47 @@ exports.uploadPhoto = async (req, res) => {
     return res.status(201).json({ imageId: result.insertId, path: relPath });
   } catch (error) {
     return res.status(500).json({ message: 'Upload failed', error: error.message });
+  }
+};
+
+exports.listAlbums = async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      `SELECT a.id, a.name, a.created_at, COUNT(i.id) AS image_count
+       FROM albums a
+       LEFT JOIN images i ON i.album_id = a.id
+       WHERE a.user_id = ?
+       GROUP BY a.id, a.name, a.created_at
+       ORDER BY a.name ASC`,
+      [req.user.id]
+    );
+    return res.json(rows.map((row) => ({
+      id: Number(row.id),
+      name: row.name,
+      created_at: row.created_at,
+      image_count: Number(row.image_count || 0)
+    })));
+  } catch (error) {
+    return res.status(500).json({ message: 'List albums failed', error: error.message });
+  }
+};
+
+exports.createAlbum = async (req, res) => {
+  const name = String(req.body?.name || '').trim().slice(0, 100);
+  if (!name) {
+    return res.status(400).json({ message: 'Album name is required' });
+  }
+  try {
+    const [insert] = await db.query(
+      'INSERT INTO albums (user_id, name) VALUES (?, ?)',
+      [req.user.id, name]
+    );
+    return res.status(201).json({ id: insert.insertId, name });
+  } catch (error) {
+    if (String(error?.code || '') === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ message: 'Album name already exists' });
+    }
+    return res.status(500).json({ message: 'Create album failed', error: error.message });
   }
 };
 
@@ -213,9 +271,11 @@ exports.replaceOriginalImage = async (req, res) => {
 exports.listMyImages = async (req, res) => {
   try {
     const [rows] = await db.query(
-      `SELECT i.id, i.original_name, i.caption, i.icon_path, i.original_path, i.current_path, i.created_at, i.updated_at,
+      `SELECT i.id, i.original_name, i.caption, i.icon_path, i.original_path, i.current_path,
+              i.album_id, a.name AS album_name, i.created_at, i.updated_at,
               v.version_num, v.file_path, v.is_shared AS version_is_shared, v.created_at AS version_created_at
        FROM images i
+       LEFT JOIN albums a ON a.id = i.album_id
        LEFT JOIN image_versions v ON v.image_id = i.id
        WHERE i.user_id = ?
        ORDER BY i.updated_at DESC, v.version_num ASC`,
@@ -230,6 +290,8 @@ exports.listMyImages = async (req, res) => {
           original_name: row.original_name,
           caption: row.caption || '',
           icon_path: row.icon_path || '',
+          album_id: row.album_id ? Number(row.album_id) : null,
+          album_name: row.album_name || null,
           original_path: row.original_path,
           current_path: row.current_path,
           created_at: row.created_at,
@@ -330,6 +392,52 @@ exports.updateImageCaption = async (req, res) => {
     return res.json({ message: 'Caption updated', imageId, caption });
   } catch (error) {
     return res.status(500).json({ message: 'Caption update failed', error: error.message });
+  }
+};
+
+exports.assignImageAlbum = async (req, res) => {
+  const imageId = Number(req.params.id);
+  const rawAlbumId = req.body?.album_id;
+  const hasAlbum = !(rawAlbumId === undefined || rawAlbumId === null || rawAlbumId === '');
+  const albumId = hasAlbum ? Number(rawAlbumId) : null;
+
+  if (!Number.isInteger(imageId) || imageId < 1) {
+    return res.status(400).json({ message: 'Invalid image id' });
+  }
+  if (hasAlbum && (!Number.isInteger(albumId) || albumId < 1)) {
+    return res.status(400).json({ message: 'Invalid album id' });
+  }
+
+  try {
+    const [imageRows] = await db.query(
+      'SELECT id FROM images WHERE id = ? AND user_id = ?',
+      [imageId, req.user.id]
+    );
+    if (!imageRows[0]) return res.status(404).json({ message: 'Image not found' });
+
+    let albumName = null;
+    if (hasAlbum) {
+      const [albumRows] = await db.query(
+        'SELECT id, name FROM albums WHERE id = ? AND user_id = ?',
+        [albumId, req.user.id]
+      );
+      if (!albumRows[0]) return res.status(404).json({ message: 'Album not found' });
+      albumName = albumRows[0].name;
+    }
+
+    await db.query(
+      'UPDATE images SET album_id = ? WHERE id = ? AND user_id = ?',
+      [hasAlbum ? albumId : null, imageId, req.user.id]
+    );
+
+    return res.json({
+      message: hasAlbum ? 'Image assigned to album' : 'Image removed from album',
+      imageId,
+      album_id: hasAlbum ? albumId : null,
+      album_name: albumName
+    });
+  } catch (error) {
+    return res.status(500).json({ message: 'Assign album failed', error: error.message });
   }
 };
 

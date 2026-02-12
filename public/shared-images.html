@@ -19,7 +19,10 @@
       <header class="hero">
         <h1 id="heroTitle">Image Restore Studio</h1>
         <p id="heroSubtitle">Upload, restore, compare, and download your photos.</p>
-        <p id="heroUser" class="hero-user" hidden></p>
+        <div class="hero-meta">
+          <p id="heroUser" class="hero-user" hidden></p>
+          <button id="heroLogout" class="ghost danger hero-logout" type="button" hidden>Logout</button>
+        </div>
       </header>
       <nav class="section-nav">
         <a href="/your-images.html">Your Images</a>
@@ -73,7 +76,7 @@
           <h2 id="yourImagesTitle">Your Images</h2>
           <span id="yourImagesCount" class="section-count">Total Images: 0</span>
           <div class="btn-row">
-            <button id="toggleYourLayout" class="ghost subtle-btn" type="button">Layout: List</button>
+            <button id="toggleYourLayout" class="ghost subtle-btn" type="button">Layout: Edit</button>
             <button id="toggleMetadata" class="ghost subtle-btn" type="button">Hide Image Info</button>
             <button id="refresh" class="icon-btn ghost" aria-label="Refresh Library" title="Refresh Library">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5a7 7 0 0 1 6.65 4.8H21l-3.4 3.9-3.6-3.9h2.6A5 5 0 1 0 17 14h2a7 7 0 1 1-7-9z"/></svg>

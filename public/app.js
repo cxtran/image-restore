@@ -14,6 +14,8 @@ const state = {
   selectedImageId: null,
   selectedVersions: {},
   images: [],
+  albums: [],
+  albumFilter: 'all',
   sharedImages: [],
   showImageMetadata: false,
   beforeBytes: null,
@@ -28,6 +30,7 @@ const METADATA_VIS_KEY = 'show_image_metadata';
 const SHARED_LAYOUT_KEY = 'shared_images_layout';
 const SHARED_CAPTION_VIS_KEY = 'show_shared_captions';
 const YOUR_LAYOUT_KEY = 'your_images_layout';
+const ALBUM_FILTER_KEY = 'album_filter';
 const supportedLanguages = new Set(['en', 'vi']);
 let currentLang = (() => {
   const saved = String(window.localStorage.getItem(LANG_KEY) || 'en').toLowerCase();
@@ -54,6 +57,10 @@ state.yourLayout = (() => {
   if (saved === 'masonry') return 'masonry';
   return 'list';
 })();
+state.albumFilter = (() => {
+  const saved = String(window.localStorage.getItem(ALBUM_FILTER_KEY) || 'all').trim();
+  return saved || 'all';
+})();
 
 const i18n = {
   en: {
@@ -75,12 +82,22 @@ const i18n = {
     hideMetadata: 'Hide Image Info',
     showCaption: 'Show Caption',
     hideCaption: 'Hide Caption',
-    layoutList: 'Layout: List',
+    layoutList: 'Layout: Edit',
     layoutTile: 'Layout: Tile',
     layoutMasonry: 'Layout: Masonry',
     totalImages: 'Total Images: {count}',
     yourImages: 'Your Images',
     sharedImages: 'Shared Images',
+    albums: 'Albums',
+    createAlbum: 'Create Album',
+    albumName: 'Album name',
+    allAlbums: 'All Albums',
+    uncategorized: 'Uncategorized',
+    moveToAlbum: 'Move to album',
+    totalAlbums: 'Total Albums: {count}',
+    albumCreated: 'Album "{name}" created.',
+    albumAssigned: 'Image moved to album "{name}".',
+    albumCleared: 'Image removed from album.',
     refreshLibrary: 'Refresh Library',
     notification: 'Notification',
     close: 'Close',
@@ -351,6 +368,7 @@ const authMessageEl = document.getElementById('authMessage');
 const accountLabelEl = document.getElementById('accountLabel');
 const adminLinkEl = document.getElementById('adminLink');
 const heroUserEl = document.getElementById('heroUser');
+const heroLogoutBtnEl = document.getElementById('heroLogout');
 const authOnlyEls = Array.from(document.querySelectorAll('.auth-only'));
 const beforeSizeEl = document.getElementById('beforeSize');
 const afterSizeEl = document.getElementById('afterSize');
@@ -398,6 +416,11 @@ const toggleYourLayoutEl = document.getElementById('toggleYourLayout');
 const toggleSharedLayoutEl = document.getElementById('toggleSharedLayout');
 const yourImagesCountEl = document.getElementById('yourImagesCount');
 const sharedImagesCountEl = document.getElementById('sharedImagesCount');
+const albumsTitleEl = document.getElementById('albumsTitle');
+const albumsCountEl = document.getElementById('albumsCount');
+const albumNameInputEl = document.getElementById('albumName');
+const createAlbumBtnEl = document.getElementById('createAlbum');
+const albumFilterEl = document.getElementById('albumFilter');
 const loginPasswordInputEl = document.getElementById('password');
 const loginPasswordToggleEl = document.getElementById('toggleLoginPassword');
 const languageLabelEl = document.getElementById('languageLabel');
@@ -527,6 +550,49 @@ function syncImageCounts() {
     ), 0);
     sharedImagesCountEl.textContent = t('totalImages', { count: sharedCount });
   }
+  if (albumsCountEl) {
+    albumsCountEl.textContent = t('totalAlbums', { count: state.albums.length });
+  }
+}
+
+function normalizeAlbumFilterValue(value) {
+  const raw = String(value || 'all').trim();
+  if (raw === 'all' || raw === 'none') return raw;
+  if (/^id:\d+$/.test(raw)) return raw;
+  return 'all';
+}
+
+function getVisibleImages() {
+  if (!albumFilterEl) return state.images;
+  const mode = normalizeAlbumFilterValue(state.albumFilter);
+  if (mode === 'all') return state.images;
+  if (mode === 'none') {
+    return state.images.filter((row) => !row.album_id);
+  }
+  const albumId = Number(mode.slice(3));
+  return state.images.filter((row) => Number(row.album_id) === albumId);
+}
+
+function syncAlbumFilterUI() {
+  if (!albumFilterEl) return;
+  const prev = normalizeAlbumFilterValue(state.albumFilter);
+  albumFilterEl.innerHTML = '';
+
+  const options = [
+    { value: 'all', label: t('allAlbums') },
+    { value: 'none', label: t('uncategorized') },
+    ...state.albums.map((a) => ({ value: `id:${a.id}`, label: String(a.name || `#${a.id}`) }))
+  ];
+  options.forEach((opt) => {
+    const option = document.createElement('option');
+    option.value = opt.value;
+    option.textContent = opt.label;
+    albumFilterEl.appendChild(option);
+  });
+
+  const exists = options.some((opt) => opt.value === prev);
+  state.albumFilter = exists ? prev : 'all';
+  albumFilterEl.value = state.albumFilter;
 }
 
 function syncSharedLayoutUI() {
@@ -591,7 +657,11 @@ function applyLanguage() {
   setText('login', 'login');
   setText('adminLink', 'admin');
   setText('logout', 'logout');
+  setText('heroLogout', 'logout');
   setText('uploadTitle', 'uploadImage');
+  setText('albumsTitle', 'albums');
+  setText('createAlbum', 'createAlbum');
+  if (albumFilterEl) albumFilterEl.setAttribute('aria-label', t('albums'));
   if (filePickerBtnEl) filePickerBtnEl.textContent = getFilePickerText('chooseFile');
   updateFilePickerLabel(photoInputEl?.files?.[0] || null);
   setText('yourImagesTitle', 'yourImages');
@@ -641,6 +711,7 @@ function applyLanguage() {
   setPlaceholder('forceConfirmPassword', 'confirmNewPassword');
   setPlaceholder('targetWidth', 'width');
   setPlaceholder('targetHeight', 'auto');
+  setPlaceholder('albumName', 'albumName');
 
   setCheckboxLabel('face', t('faceRestore'));
   setCheckboxLabel('colorize', t('colorize'));
@@ -684,6 +755,7 @@ function applyLanguage() {
   syncSharedCaptionToggleUI();
   syncYourLayoutUI();
   syncImageCounts();
+  syncAlbumFilterUI();
   renderImageList();
   renderSharedImageList();
   if (state.currentUser && state.currentUser.email) {
@@ -882,12 +954,18 @@ function setAuthUI(user) {
     heroUserEl.textContent = loggedIn ? t('signedInAs', { email: user.email }) : '';
     heroUserEl.hidden = !loggedIn;
   }
+  if (heroLogoutBtnEl) {
+    heroLogoutBtnEl.hidden = !loggedIn;
+  }
   if (adminLinkEl) adminLinkEl.hidden = !(loggedIn && role === 'admin');
   authOnlyEls.forEach((el) => {
     el.hidden = !loggedIn || forcePasswordRequired;
   });
   if (!loggedIn) resetProgress();
   if (!loggedIn) {
+    state.albums = [];
+    state.albumFilter = 'all';
+    syncAlbumFilterUI();
     closeEnhanceModal();
     pendingUploadFile = null;
     photoInputEl.value = '';
@@ -1387,14 +1465,74 @@ async function deleteAllEnhancedVersions(imageId) {
   log(t('deletedAllEnhanced'), { popup: true });
 }
 
+async function createAlbum() {
+  const name = String(albumNameInputEl?.value || '').trim().slice(0, 100);
+  if (!name) {
+    throw new Error(t('albumName'));
+  }
+  const data = await api('/api/images/albums', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name })
+  });
+  if (albumNameInputEl) albumNameInputEl.value = '';
+  await refreshImages();
+  state.albumFilter = `id:${data.id}`;
+  window.localStorage.setItem(ALBUM_FILTER_KEY, state.albumFilter);
+  syncAlbumFilterUI();
+  renderImageList();
+  log(t('albumCreated', { name: data.name }), { popup: true });
+}
+
+async function moveImageToAlbum(imageId, albumId) {
+  const payload = { album_id: albumId === null ? null : Number(albumId) };
+  const data = await api(`/api/images/${imageId}/album`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  await refreshImages();
+  log(data.album_name
+    ? t('albumAssigned', { name: data.album_name })
+    : t('albumCleared'));
+}
+
+function buildAlbumMoveControl(row) {
+  const wrap = document.createElement('div');
+  wrap.className = 'album-move-wrap';
+  const label = document.createElement('label');
+  label.textContent = t('moveToAlbum');
+  const select = document.createElement('select');
+  const noneOpt = document.createElement('option');
+  noneOpt.value = '';
+  noneOpt.textContent = t('uncategorized');
+  select.appendChild(noneOpt);
+  state.albums.forEach((album) => {
+    const opt = document.createElement('option');
+    opt.value = String(album.id);
+    opt.textContent = String(album.name);
+    select.appendChild(opt);
+  });
+  select.value = row.album_id ? String(row.album_id) : '';
+  select.addEventListener('change', () => {
+    const next = String(select.value || '').trim();
+    moveImageToAlbum(row.id, next ? Number(next) : null).catch((e) => log(e.message));
+  });
+  wrap.appendChild(label);
+  wrap.appendChild(select);
+  return wrap;
+}
+
 function renderImageList() {
   const list = document.getElementById('images');
   list.innerHTML = '';
   syncImageCounts();
   syncYourLayoutUI();
+  const visibleImages = getVisibleImages();
+  const showAlbumUI = Boolean(albumFilterEl);
 
   if (state.yourLayout === 'tile' || state.yourLayout === 'masonry') {
-    state.images.forEach((row) => {
+    visibleImages.forEach((row) => {
       const li = document.createElement('li');
       const tileBtn = document.createElement('button');
       tileBtn.type = 'button';
@@ -1426,7 +1564,7 @@ function renderImageList() {
     return;
   }
 
-  state.images.forEach((row) => {
+  visibleImages.forEach((row) => {
     const li = document.createElement('li');
 
     const metaWrap = document.createElement('div');
@@ -1517,6 +1655,12 @@ function renderImageList() {
       captionTextEl.textContent = row.caption;
       metaWrap.appendChild(captionTextEl);
     }
+    if (showAlbumUI && row.album_name) {
+      const albumChipEl = document.createElement('span');
+      albumChipEl.className = 'album-chip';
+      albumChipEl.textContent = row.album_name;
+      metaWrap.appendChild(albumChipEl);
+    }
     metaWrap.onclick = () => setSelectedImage(row);
 
     const actions = document.createElement('div');
@@ -1556,6 +1700,9 @@ function renderImageList() {
     deleteBtn.className = 'danger ghost';
     deleteBtn.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5h8l1 2h4v2H3V7h4l1-2zm1 6h2v8H9v-8zm4 0h2v8h-2v-8z"/></svg><span>${t('delete')}</span>`;
     deleteBtn.onclick = () => deleteImage(row.id).catch((e) => log(e.message));
+    if (showAlbumUI) {
+      actions.appendChild(buildAlbumMoveControl(row));
+    }
     actions.appendChild(enhanceBtn);
     actions.appendChild(editOriginalBtn);
     actions.appendChild(deleteBtn);
@@ -1688,33 +1835,39 @@ if (loginBtnInlineEl) {
 }
 
 const logoutBtnInlineEl = document.getElementById('logout');
+const handleLogout = async () => {
+  try {
+    await api('/api/auth/logout', { method: 'POST' });
+    const emailInputEl = document.getElementById('email');
+    const passwordInputEl = document.getElementById('password');
+    if (emailInputEl) emailInputEl.value = '';
+    if (passwordInputEl) passwordInputEl.value = '';
+    setAuthUI(null);
+    state.images = [];
+    state.albums = [];
+    state.sharedImages = [];
+    state.albumFilter = 'all';
+    state.selectedImageId = null;
+    state.uploadedPreviewUrl = '';
+    state.completedPreviewUrl = '';
+    state.beforeBytes = null;
+    state.afterBytes = null;
+    state.pendingEnhancedPath = '';
+    forcePasswordRequired = false;
+    renderImageList();
+    renderSharedImageList();
+    renderPreviews();
+    log(t('loggedOut'));
+    window.location.href = '/login.html';
+  } catch (e) {
+    log(e.message);
+  }
+};
 if (logoutBtnInlineEl) {
-  logoutBtnInlineEl.onclick = async () => {
-    try {
-      await api('/api/auth/logout', { method: 'POST' });
-      const emailInputEl = document.getElementById('email');
-      const passwordInputEl = document.getElementById('password');
-      if (emailInputEl) emailInputEl.value = '';
-      if (passwordInputEl) passwordInputEl.value = '';
-      setAuthUI(null);
-      state.images = [];
-      state.sharedImages = [];
-      state.selectedImageId = null;
-      state.uploadedPreviewUrl = '';
-      state.completedPreviewUrl = '';
-      state.beforeBytes = null;
-      state.afterBytes = null;
-      state.pendingEnhancedPath = '';
-      forcePasswordRequired = false;
-      renderImageList();
-      renderSharedImageList();
-      renderPreviews();
-      log(t('loggedOut'));
-      window.location.href = '/login.html';
-    } catch (e) {
-      log(e.message);
-    }
-  };
+  logoutBtnInlineEl.onclick = handleLogout;
+}
+if (heroLogoutBtnEl) {
+  heroLogoutBtnEl.onclick = handleLogout;
 }
 
 async function uploadPendingOrSelectedFile(caption = '') {
@@ -1724,6 +1877,13 @@ async function uploadPendingOrSelectedFile(caption = '') {
   const form = new FormData();
   form.append('photo', file);
   form.append('caption', String(caption || '').trim().slice(0, 1000));
+  const activeFilter = normalizeAlbumFilterValue(state.albumFilter);
+  if (activeFilter.startsWith('id:')) {
+    const albumId = Number(activeFilter.slice(3));
+    if (Number.isInteger(albumId) && albumId > 0) {
+      form.append('album_id', String(albumId));
+    }
+  }
   const data = await api('/api/images/upload', { method: 'POST', body: form });
 
   state.selectedImageId = data.imageId;
@@ -1862,9 +2022,10 @@ async function refreshImages() {
   if (isRefreshingImages) return;
   isRefreshingImages = true;
   try {
-    const [mine, shared] = await Promise.all([
+    const [mine, shared, albums] = await Promise.all([
       api('/api/images'),
-      api('/api/images/shared')
+      api('/api/images/shared'),
+      api('/api/images/albums')
     ]);
     state.images = [...mine].sort((a, b) => {
       const aTs = new Date(a.created_at || 0).getTime();
@@ -1882,6 +2043,10 @@ async function refreshImages() {
       }
       return Number(b.id || 0) - Number(a.id || 0);
     });
+    state.albums = Array.isArray(albums)
+      ? [...albums].sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))
+      : [];
+    syncAlbumFilterUI();
     renderImageList();
     renderSharedImageList();
 
@@ -1909,6 +2074,26 @@ document.getElementById('refresh').onclick = async () => {
     log(e.message);
   }
 };
+
+if (createAlbumBtnEl) {
+  createAlbumBtnEl.addEventListener('click', () => {
+    createAlbum().catch((e) => log(e.message));
+  });
+}
+if (albumNameInputEl) {
+  albumNameInputEl.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    createAlbum().catch((err) => log(err.message));
+  });
+}
+if (albumFilterEl) {
+  albumFilterEl.addEventListener('change', (e) => {
+    state.albumFilter = normalizeAlbumFilterValue(String(e.target.value || 'all'));
+    window.localStorage.setItem(ALBUM_FILTER_KEY, state.albumFilter);
+    renderImageList();
+  });
+}
 
 if (toggleMetadataEl) {
   toggleMetadataEl.addEventListener('click', () => {
@@ -2315,6 +2500,10 @@ if (forcePasswordLogoutEl) {
   forcePasswordLogoutEl.addEventListener('click', () => {
     if (logoutBtnInlineEl) {
       logoutBtnInlineEl.click();
+      return;
+    }
+    if (heroLogoutBtnEl) {
+      heroLogoutBtnEl.click();
       return;
     }
     window.location.href = '/login.html';

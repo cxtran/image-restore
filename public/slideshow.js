@@ -11,6 +11,8 @@ const slideMetaEl = document.getElementById('slideMeta');
 const prevBtn = document.getElementById('prevSlide');
 const nextBtn = document.getElementById('nextSlide');
 const playBtn = document.getElementById('togglePlay');
+const heroUserEl = document.getElementById('heroUser');
+const heroLogoutBtnEl = document.getElementById('heroLogout');
 
 const state = {
   items: [],
@@ -68,15 +70,25 @@ function move(delta) {
   restartTimer();
 }
 
+function setHeroUser(user) {
+  if (heroUserEl) {
+    heroUserEl.textContent = user && user.email ? `Signed in as ${user.email}` : '';
+    heroUserEl.hidden = !(user && user.email);
+  }
+  if (heroLogoutBtnEl) {
+    heroLogoutBtnEl.hidden = !(user && user.email);
+  }
+}
+
 async function requireLogin() {
   try {
-    await api('/api/auth/me');
-    return true;
+    const user = await api('/api/auth/me');
+    return user;
   } catch (_error) {
     const nextPath = `${window.location.pathname}${window.location.search || ''}`;
     const encoded = encodeURIComponent(nextPath);
     window.location.href = `/login.html?next=${encoded}`;
-    return false;
+    return null;
   }
 }
 
@@ -114,8 +126,19 @@ if (nextBtn) {
 if (playBtn) {
   playBtn.addEventListener('click', () => setPlaying(!state.playing));
 }
+if (heroLogoutBtnEl) {
+  heroLogoutBtnEl.addEventListener('click', async () => {
+    try {
+      await api('/api/auth/logout', { method: 'POST' });
+    } catch (_err) {
+      // Continue redirecting even if session is already invalid.
+    }
+    window.location.href = '/login.html';
+  });
+}
 
-requireLogin().then((ok) => {
-  if (!ok) return;
+requireLogin().then((user) => {
+  if (!user) return;
+  setHeroUser(user);
   loadSlides();
 });

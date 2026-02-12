@@ -149,6 +149,26 @@ async function ensureImageVersionSharedColumn() {
   }
 }
 
+async function ensureAlbumsTable() {
+  await db.query(
+    `CREATE TABLE IF NOT EXISTS albums (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      name VARCHAR(100) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_album_user_name (user_id, name),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )`
+  );
+}
+
+async function ensureImageAlbumColumn() {
+  const [rows] = await db.query("SHOW COLUMNS FROM images LIKE 'album_id'");
+  if (rows.length === 0) {
+    await db.query('ALTER TABLE images ADD COLUMN album_id INT NULL');
+  }
+}
+
 async function bootstrap() {
   try {
     await ensureRoleColumn();
@@ -157,6 +177,8 @@ async function bootstrap() {
     await ensureImageCaptionColumn();
     await ensureImageIconColumn();
     await ensureImageVersionSharedColumn();
+    await ensureAlbumsTable();
+    await ensureImageAlbumColumn();
     server.listen(PORT, () => {
       console.log(`Image Restore Studio running on port ${PORT}`);
     });

@@ -31,6 +31,7 @@ const i18n = {
     email: 'Email',
     passwordMinHint: 'Password (min 8 chars)',
     createUser: 'Create User',
+    logout: 'Logout',
     users: 'Users',
     refreshUsers: 'Refresh Users',
     allImages: 'All Images',
@@ -142,6 +143,8 @@ const adminResetPwdCancelEl = document.getElementById('adminResetPwdCancel');
 const adminResetPwdOkEl = document.getElementById('adminResetPwdOk');
 const languageLabelEl = document.getElementById('languageLabel');
 const languageToggleEl = document.getElementById('languageToggle');
+const heroUserEl = document.getElementById('heroUser');
+const heroLogoutBtnEl = document.getElementById('heroLogout');
 let confirmResolver = null;
 let resetPwdUserId = null;
 
@@ -174,6 +177,7 @@ function applyLanguage() {
   setText('adminAccountTitle', 'adminAccount');
   setText('addUserTitle', 'addUser');
   setText('createUserBtn', 'createUser');
+  setText('heroLogout', 'logout');
   setText('usersTitle', 'users');
   setText('allImagesTitle', 'allImages');
   setText('adminNoticeTitle', 'adminNotification');
@@ -224,8 +228,18 @@ function applyLanguage() {
 
   if (!state.me) {
     adminIdentityEl.textContent = t('checkingAdmin');
+    if (heroUserEl) {
+      heroUserEl.textContent = '';
+      heroUserEl.hidden = true;
+    }
+    if (heroLogoutBtnEl) heroLogoutBtnEl.hidden = true;
   } else {
     adminIdentityEl.textContent = t('signedInAs', { email: state.me.email, role: displayRole(state.me.role) });
+    if (heroUserEl) {
+      heroUserEl.textContent = t('signedInAs', { email: state.me.email, role: displayRole(state.me.role) });
+      heroUserEl.hidden = false;
+    }
+    if (heroLogoutBtnEl) heroLogoutBtnEl.hidden = false;
   }
 
   renderUsers();
@@ -343,7 +357,21 @@ async function ensureAdmin() {
     return false;
   }
   adminIdentityEl.textContent = t('signedInAs', { email: me.email, role: displayRole(me.role) });
+  if (heroUserEl) {
+    heroUserEl.textContent = t('signedInAs', { email: me.email, role: displayRole(me.role) });
+    heroUserEl.hidden = false;
+  }
+  if (heroLogoutBtnEl) heroLogoutBtnEl.hidden = false;
   return true;
+}
+
+async function logout() {
+  try {
+    await api('/api/auth/logout', { method: 'POST' });
+  } catch (_err) {
+    // Continue redirecting even if session is already invalid.
+  }
+  window.location.href = '/login.html';
 }
 
 
@@ -473,6 +501,11 @@ if (languageToggleEl) {
   languageToggleEl.value = currentLang;
   languageToggleEl.addEventListener('change', (event) => {
     setLanguage(String(event.target.value || 'en').toLowerCase());
+  });
+}
+if (heroLogoutBtnEl) {
+  heroLogoutBtnEl.addEventListener('click', () => {
+    logout();
   });
 }
 
